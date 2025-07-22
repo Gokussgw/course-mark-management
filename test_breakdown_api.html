@@ -1,62 +1,76 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>Test Breakdown API</title>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Test Updated Breakdown API</h1>
-    
+
     <div>
-        <h2>Test Course Breakdown</h2>
-        <button onclick="testCourseBreakdown()">Test Course Breakdown</button>
-        <div id="course-breakdown-results"></div>
+      <h2>Test Course Breakdown</h2>
+      <button onclick="testCourseBreakdown()">Test Course Breakdown</button>
+      <div id="course-breakdown-results"></div>
     </div>
 
     <div>
-        <h2>Test Student Breakdown</h2>
-        <button onclick="testStudentBreakdown()">Test Student Breakdown</button>
-        <div id="student-breakdown-results"></div>
+      <h2>Test Student Breakdown</h2>
+      <button onclick="testStudentBreakdown()">Test Student Breakdown</button>
+      <div id="student-breakdown-results"></div>
     </div>
 
     <div>
-        <h2>Test Component Analytics</h2>
-        <button onclick="testComponentAnalytics()">Test Component Analytics</button>
-        <div id="component-analytics-results"></div>
+      <h2>Test Component Analytics</h2>
+      <button onclick="testComponentAnalytics()">
+        Test Component Analytics
+      </button>
+      <div id="component-analytics-results"></div>
     </div>
 
     <script>
-        function testCourseBreakdown() {
-            fetch('http://localhost:8000/breakdown-api.php?action=course_breakdown&course_id=1')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('course-breakdown-results').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-                })
-                .catch(error => {
-                    document.getElementById('course-breakdown-results').innerHTML = 'Error: ' + error;
-                });
-        }
+      function testCourseBreakdown() {
+        fetch(
+          "http://localhost:8000/breakdown-api.php?action=course_breakdown&course_id=1"
+        )
+          .then((response) => response.json())
+          .then((data) => {
+            document.getElementById("course-breakdown-results").innerHTML =
+              "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+          })
+          .catch((error) => {
+            document.getElementById("course-breakdown-results").innerHTML =
+              "Error: " + error;
+          });
+      }
 
-        function testStudentBreakdown() {
-            fetch('http://localhost:8000/breakdown-api.php?action=student_breakdown&student_id=4&course_id=1')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('student-breakdown-results').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-                })
-                .catch(error => {
-                    document.getElementById('student-breakdown-results').innerHTML = 'Error: ' + error;
-                });
-        }
+      function testStudentBreakdown() {
+        fetch(
+          "http://localhost:8000/breakdown-api.php?action=student_breakdown&student_id=4&course_id=1"
+        )
+          .then((response) => response.json())
+          .then((data) => {
+            document.getElementById("student-breakdown-results").innerHTML =
+              "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+          })
+          .catch((error) => {
+            document.getElementById("student-breakdown-results").innerHTML =
+              "Error: " + error;
+          });
+      }
 
-        function testComponentAnalytics() {
-            fetch('http://localhost:8000/breakdown-api.php?action=assessment_analytics&course_id=1')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('component-analytics-results').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-                })
-                .catch(error => {
-                    document.getElementById('component-analytics-results').innerHTML = 'Error: ' + error;
-                });
-        }
+      function testComponentAnalytics() {
+        fetch(
+          "http://localhost:8000/breakdown-api.php?action=assessment_analytics&course_id=1"
+        )
+          .then((response) => response.json())
+          .then((data) => {
+            document.getElementById("component-analytics-results").innerHTML =
+              "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+          })
+          .catch((error) => {
+            document.getElementById("component-analytics-results").innerHTML =
+              "Error: " + error;
+          });
+      }
     </script>
-</body>
+  </body>
 </html>

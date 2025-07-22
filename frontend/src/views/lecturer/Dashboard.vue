@@ -9,9 +9,7 @@
       <div class="d-flex align-items-center gap-3">
         <router-link 
           to="/lecturer/marks" 
- import { mapGetters } from 'vuex'
-import MarkDistributionChart from '@/components/charts/MarkDistributionChart.vue';
-import ComponentChart from '@/components/charts/ComponentChart.vue';      class="btn btn-success"
+          class="btn btn-success"
           title="Manage Marks"
         >
           <i class="fas fa-graduation-cap me-2"></i>Manage Marks
@@ -27,9 +25,38 @@ import ComponentChart from '@/components/charts/ComponentChart.vue';      class=
           <small class="text-muted d-block">{{ getUser.email }}</small>
           <small class="badge bg-primary">{{ getUser.role }}</small>
         </div>
+        <div class="position-relative">
+          <button 
+            class="btn btn-outline-secondary"
+            @click="toggleNotificationPanel"
+            title="Notifications"
+          >
+            <i class="fas fa-bell"></i>
+            <span 
+              v-if="unreadNotificationCount > 0" 
+              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+            >
+              {{ unreadNotificationCount }}
+            </span>
+          </button>
+        </div>
         <button class="btn btn-outline-danger" @click="logout" title="Logout">
           <i class="fas fa-sign-out-alt me-2"></i>Logout
         </button>
+      </div>
+    </div>
+    
+    <!-- Notification Panel (collapsible) -->
+    <div v-if="showNotificationPanel" class="row mb-4">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-body">
+            <NotificationPanel 
+              :user-id="getUser.id"
+              @notification-clicked="handleNotificationClick"
+            />
+          </div>
+        </div>
       </div>
     </div>
     
@@ -230,6 +257,13 @@ import ComponentChart from '@/components/charts/ComponentChart.vue';      class=
                       <router-link :to="`/lecturer/breakdown/${component.course_id}`" class="btn btn-outline-info" title="View detailed breakdown">
                         <i class="fas fa-chart-bar"></i>
                       </router-link>
+                      <button 
+                        class="btn btn-outline-success" 
+                        @click="openNotificationModal(component)"
+                        :title="`Notify students about ${component.name} marks`"
+                      >
+                        <i class="fas fa-bell"></i>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -407,25 +441,35 @@ import ComponentChart from '@/components/charts/ComponentChart.vue';      class=
 import { mapGetters } from 'vuex';
 import ComponentChart from '@/components/charts/ComponentChart.vue';
 import MarkDistributionChart from '@/components/charts/MarkDistributionChart.vue';
+import NotificationPanel from '@/components/notifications/NotificationPanel.vue';
 import * as bootstrap from 'bootstrap';
 
 export default {
   name: 'LecturerDashboard',
   components: {
     ComponentChart,
-    MarkDistributionChart
+    MarkDistributionChart,
+    NotificationPanel
   },
   data() {
     return {
       courses: [],
-      assessments: [],
+      courseComponents: [],
       marks: [],
-      selectedAssessment: null,
+      selectedComponent: null,
       notification: {
         title: '',
         message: '',
         includeMarks: true
       },
+      showNotificationPanel: false,
+      unreadNotificationCount: 0,
+      standardComponents: [
+        { name: 'Assignment', type: 'assignment', weightage: 25 },
+        { name: 'Quiz', type: 'quiz', weightage: 20 },
+        { name: 'Test', type: 'test', weightage: 25 },
+        { name: 'Final Exam', type: 'final_exam', weightage: 30 }
+      ],
       markDistribution: {
         gradeA: 4,
         gradeB: 7,
@@ -466,14 +510,7 @@ export default {
   },
   computed: {
     ...mapGetters(['isLoading']),
-    ...mapGetters('auth', ['getUser']),
-    
-    upcomingAssessments() {
-      return this.assessments
-        .filter(assessment => !assessment.is_graded)
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
-        .slice(0, 5);
-    }
+    ...mapGetters('auth', ['getUser'])
   },
   created() {
     this.loadData();
@@ -486,18 +523,104 @@ export default {
           lecturerId: this.getUser.id
         });
         
-        // Fetch assessments for all courses
-        const courseIds = this.courses.map(course => course.id);
+        // Fetch component data for all courses
+        await this.loadComponentData();
         
-        for (const courseId of courseIds) {
-          const courseAssessments = await this.$store.dispatch('assessments/fetchAssessments', {
-            courseId
-          });
-          this.assessments = [...this.assessments, ...courseAssessments];
-        }
+        // Update mark distribution with real data
+        await this.loadMarkDistribution();
+        
+        // Load unread notification count
+        await this.loadUnreadCount();
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       }
+    },
+    
+    async loadComponentData() {
+      this.courseComponents = [];
+      
+      for (const course of this.courses) {
+        try {
+          const response = await fetch(`http://localhost:8080/breakdown-api.php?action=course_breakdown&course_id=${course.id}`);
+          const data = await response.json();
+          
+          if (!data.error && data.component_breakdown) {
+            data.component_breakdown.forEach(comp => {
+              this.courseComponents.push({
+                course_id: course.id,
+                type: comp.type,
+                name: comp.name,
+                weightage: comp.weightage,
+                completed: comp.submissions || 0,
+                total: data.statistics?.total_students || 0,
+                completion_rate: data.statistics?.total_students > 0 ? 
+                  Math.round(((comp.submissions || 0) / data.statistics.total_students) * 100) : 0,
+                average: Math.round(comp.average_percentage || 0)
+              });
+            });
+          }
+        } catch (error) {
+          console.error(`Error loading component data for course ${course.id}:`, error);
+        }
+      }
+    },
+    
+    async loadMarkDistribution() {
+      // This could fetch real grade distribution data
+      // For now, we'll calculate it from the component data
+      let totalA = 0, totalB = 0, totalC = 0, totalD = 0, totalF = 0;
+      
+      for (const course of this.courses) {
+        try {
+          const response = await fetch(`http://localhost:8080/marks-api.php?action=course_students_with_marks&course_id=${course.id}`);
+          const data = await response.json();
+          
+          if (data.success && data.students) {
+            data.students.forEach(student => {
+              const grade = student.letter_grade;
+              if (grade === 'A' || grade === 'A+' || grade === 'A-') totalA++;
+              else if (grade === 'B' || grade === 'B+' || grade === 'B-') totalB++;
+              else if (grade === 'C' || grade === 'C+' || grade === 'C-') totalC++;
+              else if (grade === 'D' || grade === 'D+' || grade === 'D-') totalD++;
+              else totalF++;
+            });
+          }
+        } catch (error) {
+          console.error(`Error loading marks for course ${course.id}:`, error);
+        }
+      }
+      
+      this.markDistribution = {
+        gradeA: totalA,
+        gradeB: totalB,
+        gradeC: totalC,
+        gradeD: totalD,
+        gradeF: totalF
+      };
+    },
+    
+    getComponentTypeBadgeClass(type) {
+      switch (type) {
+        case 'assignment': return 'bg-success';
+        case 'quiz': return 'bg-info';
+        case 'test': return 'bg-warning';
+        case 'final_exam': return 'bg-danger';
+        default: return 'bg-secondary';
+      }
+    },
+    
+    getMarkClass(markValue) {
+      if (markValue >= 70) return 'text-success fw-bold';
+      if (markValue >= 50) return 'text-warning';
+      return 'text-danger';
+    },
+    
+    exportMarksToCSV() {
+      // Export component marks to CSV
+      this.$store.dispatch('showToast', {
+        message: 'Exporting component marks to CSV...',
+        type: 'info'
+      });
     },
     
     getAssessmentCountForCourse(courseId) {
@@ -510,6 +633,7 @@ export default {
     },
     
     getAssessmentTypeBadgeClass(type) {
+      // Keep this for backward compatibility if needed
       switch (type) {
         case 'quiz': return 'bg-info';
         case 'assignment': return 'bg-primary';
@@ -719,15 +843,19 @@ export default {
       document.body.removeChild(link);
     },
     
-    openNotificationModal(assessment) {
-      // Set the selected assessment
-      this.selectedAssessment = assessment;
+    openNotificationModal(component) {
+      // Set the selected component (instead of assessment)
+      this.selectedAssessment = {
+        course_id: component.course_id,
+        name: component.name,
+        type: component.type
+      };
       
       // Pre-fill notification fields
-      const courseName = this.getCourseNameById(assessment.course_id);
+      const courseName = this.getCourseNameById(component.course_id);
       this.notification = {
-        title: `${assessment.name} Update`,
-        message: `Dear Students,\n\nThe marks for ${assessment.name} in ${courseName} have been updated. Please login to view your results.\n\nRegards,\n${this.getUser.name}`,
+        title: `${component.name} Update`,
+        message: `Dear Students,\n\nThe marks for ${component.name} in ${courseName} have been updated. Please login to view your results.\n\nRegards,\n${this.getUser.name}`,
         includeMarks: true
       };
       
@@ -738,34 +866,55 @@ export default {
     
     async sendNotification() {
       try {
-        // In a real implementation, this would make an API call to send notifications
-        // to all students enrolled in the course with the assessment
-        
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Show success message
-        alert(`Notification sent to students in ${this.getCourseNameById(this.selectedAssessment.course_id)}`);
-        
-        // Add to recent activities
-        const newActivity = {
-          title: 'Students Notified',
-          description: `${this.notification.title} - ${this.getCourseNameById(this.selectedAssessment.course_id)}`,
-          time: 'Just now',
-          icon: 'fas fa-bell text-success'
-        };
-        this.recentActivities.unshift(newActivity);
-        if (this.recentActivities.length > 5) {
-          this.recentActivities.pop();
+        const response = await fetch('http://localhost:8080/marks-api.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            action: 'send_course_announcement',
+            course_id: this.selectedAssessment.course_id,
+            lecturer_id: this.getUser.id,
+            title: this.notification.title,
+            message: this.notification.message,
+            include_marks: this.notification.includeMarks
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          this.$store.dispatch('showToast', {
+            message: `Notification sent successfully to ${data.notifications_sent} students!`,
+            type: 'success'
+          });
+
+          // Add to recent activities
+          const newActivity = {
+            title: 'Students Notified',
+            description: `${this.notification.title} - ${this.getCourseNameById(this.selectedAssessment.course_id)}`,
+            time: 'Just now',
+            icon: 'fas fa-bell text-success'
+          };
+          this.recentActivities.unshift(newActivity);
+          if (this.recentActivities.length > 5) {
+            this.recentActivities.pop();
+          }
+
+          // Close the modal
+          const modalElement = document.getElementById('notifyStudentsModal');
+          const modal = bootstrap.Modal.getInstance(modalElement);
+          modal.hide();
+        } else {
+          throw new Error(data.error || 'Failed to send notification');
         }
-        
-        // Close the modal
-        const modalElement = document.getElementById('notifyStudentsModal');
-        const modal = bootstrap.Modal.getInstance(modalElement);
-        modal.hide();
       } catch (error) {
         console.error('Error sending notification:', error);
-        alert('Failed to send notification. Please try again.');
+        this.$store.dispatch('showToast', {
+          message: 'Failed to send notification. Please try again.',
+          type: 'error'
+        });
       }
     },
 
@@ -773,6 +922,50 @@ export default {
       if (confirm('Are you sure you want to logout?')) {
         this.$store.dispatch('auth/logout');
         this.$router.push('/login');
+      }
+    },
+
+    toggleNotificationPanel() {
+      this.showNotificationPanel = !this.showNotificationPanel;
+      if (this.showNotificationPanel) {
+        this.loadUnreadCount();
+      }
+    },
+
+    async loadUnreadCount() {
+      try {
+        const response = await fetch(`http://localhost:8080/marks-api.php?action=unread_notifications&user_id=${this.getUser.id}`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        this.unreadNotificationCount = data.unread_count || 0;
+      } catch (error) {
+        console.error('Error loading unread notification count:', error);
+      }
+    },
+
+    handleNotificationClick(notification) {
+      // Handle different notification types
+      switch (notification.type) {
+        case 'mark':
+          // Navigate to course marks if related_id is a course_id
+          if (notification.related_id) {
+            this.$router.push(`/lecturer/course/${notification.related_id}`);
+          }
+          break;
+        case 'course':
+          // Navigate to course details
+          if (notification.related_id) {
+            this.$router.push(`/lecturer/course/${notification.related_id}`);
+          }
+          break;
+        default:
+          // Show notification content as a toast for other types
+          this.$store.dispatch('showToast', {
+            message: notification.content,
+            type: 'info',
+            timeout: 8000
+          });
       }
     }
   }

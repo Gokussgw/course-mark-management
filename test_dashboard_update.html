@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Lecturer Dashboard Update</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f8f9fa;
+      }
+      .test-section {
+        background: white;
+        margin: 20px 0;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .test-title {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+      }
+      .endpoint {
+        background: #e8f4f8;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        margin: 10px 0;
+      }
+      .expected {
+        background: #e8f5e8;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+      }
+      .result {
+        background: #fff3cd;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+        min-height: 100px;
+      }
+      button {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #2980b9;
+      }
+      .success {
+        color: #27ae60;
+      }
+      .error {
+        color: #e74c3c;
+      }
+      .component-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin: 15px 0;
+      }
+      .component-card {
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 6px;
+        text-align: center;
+      }
+      .component-card h4 {
+        margin: 0 0 10px 0;
+        color: #2c3e50;
+      }
+      .weightage {
+        font-size: 24px;
+        font-weight: bold;
+        color: #3498db;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Lecturer Dashboard Update Test</h1>
+    <p>
+      Testing the updated Dashboard.vue component to use component-based data
+      instead of assessment-based
+    </p>
+
+    <div class="test-section">
+      <h2 class="test-title">1. Standard Component Types</h2>
+      <p>
+        The dashboard should display these standard components instead of
+        dynamic assessment types:
+      </p>
+      <div class="component-grid">
+        <div class="component-card">
+          <h4>Assignment</h4>
+          <div class="weightage">25%</div>
+          <p>Written assignments and projects</p>
+        </div>
+        <div class="component-card">
+          <h4>Quiz</h4>
+          <div class="weightage">20%</div>
+          <p>Short assessments and quizzes</p>
+        </div>
+        <div class="component-card">
+          <h4>Test</h4>
+          <div class="weightage">25%</div>
+          <p>Mid-term tests and evaluations</p>
+        </div>
+        <div class="component-card">
+          <h4>Final Exam</h4>
+          <div class="weightage">30%</div>
+          <p>Final examination</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h2 class="test-title">2. Test Component Data API</h2>
+      <div class="endpoint">
+        GET
+        http://localhost:8080/breakdown-api.php?action=course_breakdown&course_id=1
+      </div>
+      <div class="expected">
+        Expected: Component breakdown data for dashboard overview
+      </div>
+      <button onclick="testComponentData()">Test Component Data</button>
+      <div id="component-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2 class="test-title">3. Test Grade Distribution API</h2>
+      <div class="endpoint">
+        GET
+        http://localhost:8080/marks-api.php?action=course_students_with_marks&course_id=1
+      </div>
+      <div class="expected">
+        Expected: Student marks data for grade distribution chart
+      </div>
+      <button onclick="testGradeDistribution()">Test Grade Distribution</button>
+      <div id="grade-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2 class="test-title">4. Access Updated Lecturer Dashboard</h2>
+      <div class="endpoint">http://localhost:8081/lecturer/dashboard</div>
+      <div class="expected">
+        <strong>Expected Changes:</strong>
+        <ul>
+          <li>
+            <strong>Component Types chart</strong> instead of Assessment Types
+          </li>
+          <li>
+            <strong>Component Overview table</strong> instead of Assessment
+            Overview
+          </li>
+          <li>
+            <strong>Course badges show "4 components"</strong> instead of
+            assessment count
+          </li>
+          <li><strong>Real grade distribution</strong> from student marks</li>
+          <li><strong>Component completion rates</strong> and averages</li>
+        </ul>
+      </div>
+      <button onclick="openDashboard()">Open Lecturer Dashboard</button>
+    </div>
+
+    <div class="test-section">
+      <h2 class="test-title">5. Component Overview Data</h2>
+      <div id="overview-display">
+        <!-- Will be populated by JavaScript -->
+      </div>
+    </div>
+
+    <script>
+      async function testComponentData() {
+        const resultDiv = document.getElementById("component-result");
+        resultDiv.innerHTML = "<p>Testing component breakdown API...</p>";
+
+        try {
+          const response = await fetch(
+            "http://localhost:8080/breakdown-api.php?action=course_breakdown&course_id=1"
+          );
+          const data = await response.json();
+
+          if (data.error) {
+            resultDiv.innerHTML = `<div class="error">✗ API Error: ${data.error}</div>`;
+          } else {
+            resultDiv.innerHTML = `
+                        <div class="success">✓ API Response Successful</div>
+                        <h4>Component Breakdown:</h4>
+                        <pre>${JSON.stringify(
+                          data.component_breakdown,
+                          null,
+                          2
+                        )}</pre>
+                        <h4>Statistics:</h4>
+                        <pre>${JSON.stringify(data.statistics, null, 2)}</pre>
+                    `;
+            displayComponentOverview(data);
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `<div class="error">✗ Request Failed: ${error.message}</div>`;
+        }
+      }
+
+      async function testGradeDistribution() {
+        const resultDiv = document.getElementById("grade-result");
+        resultDiv.innerHTML = "<p>Testing grade distribution data...</p>";
+
+        try {
+          const response = await fetch(
+            "http://localhost:8080/marks-api.php?action=course_students_with_marks&course_id=1"
+          );
+          const data = await response.json();
+
+          if (data.error) {
+            resultDiv.innerHTML = `<div class="error">✗ API Error: ${data.error}</div>`;
+          } else {
+            // Calculate grade distribution
+            const grades = { A: 0, B: 0, C: 0, D: 0, F: 0 };
+            data.students.forEach((student) => {
+              const grade = student.letter_grade;
+              if (grade.startsWith("A")) grades.A++;
+              else if (grade.startsWith("B")) grades.B++;
+              else if (grade.startsWith("C")) grades.C++;
+              else if (grade.startsWith("D")) grades.D++;
+              else grades.F++;
+            });
+
+            resultDiv.innerHTML = `
+                        <div class="success">✓ API Response Successful</div>
+                        <h4>Grade Distribution:</h4>
+                        <pre>${JSON.stringify(grades, null, 2)}</pre>
+                        <p><strong>Total Students:</strong> ${
+                          data.students.length
+                        }</p>
+                    `;
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `<div class="error">✗ Request Failed: ${error.message}</div>`;
+        }
+      }
+
+      function openDashboard() {
+        window.open("http://localhost:8081/lecturer/dashboard", "_blank");
+      }
+
+      function displayComponentOverview(data) {
+        const displayDiv = document.getElementById("overview-display");
+
+        if (!data.component_breakdown) {
+          displayDiv.innerHTML = "<p>No component data available</p>";
+          return;
+        }
+
+        const overviewHTML = data.component_breakdown
+          .map((comp) => {
+            const completionRate =
+              data.statistics.total_students > 0
+                ? Math.round(
+                    (comp.submissions / data.statistics.total_students) * 100
+                  )
+                : 0;
+
+            return `
+                    <div class="component-card">
+                        <h4>${comp.name}</h4>
+                        <p><strong>Weightage:</strong> ${comp.weightage}%</p>
+                        <p><strong>Average:</strong> ${Math.round(
+                          comp.average_percentage
+                        )}%</p>
+                        <p><strong>Completion:</strong> ${comp.submissions}/${
+              data.statistics.total_students
+            } (${completionRate}%)</p>
+                    </div>
+                `;
+          })
+          .join("");
+
+        displayDiv.innerHTML = `
+                <h3>Component Overview Data</h3>
+                <div class="component-grid">${overviewHTML}</div>
+            `;
+      }
+
+      // Auto-test on page load
+      document.addEventListener("DOMContentLoaded", function () {
+        setTimeout(() => {
+          testComponentData();
+          setTimeout(() => testGradeDistribution(), 1000);
+        }, 500);
+      });
+    </script>
+  </body>
+</html>

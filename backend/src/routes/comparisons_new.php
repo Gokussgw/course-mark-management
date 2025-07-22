@@ -86,7 +86,7 @@ $app->group('/api/comparisons', function ($group) {
 
             foreach ($components as $component) {
                 $markColumn = $component . '_mark';
-                
+
                 $stmt = $pdo->prepare("
                     SELECT 
                         COUNT(fm.$markColumn) as total_submissions,
@@ -272,12 +272,13 @@ $app->group('/api/comparisons', function ($group) {
 });
 
 // Helper function to calculate percentiles
-function calculatePercentile($data, $percentile) {
+function calculatePercentile($data, $percentile)
+{
     if (empty($data)) return 0;
-    
+
     sort($data);
     $index = ($percentile / 100) * (count($data) - 1);
-    
+
     if (floor($index) == $index) {
         return $data[$index];
     } else {
@@ -286,5 +287,3 @@ function calculatePercentile($data, $percentile) {
         return $lower + ($upper - $lower) * ($index - floor($index));
     }
 }
-
-?>

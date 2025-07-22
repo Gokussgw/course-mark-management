@@ -6,7 +6,13 @@
         <h1 class="mb-1">Student Dashboard</h1>
         <p class="text-muted mb-0">Welcome back, {{ getUser.name }}</p>
       </div>
-      <div class="d-flex align-items-center gap-3">
+      <div class="d-flex align-it      // When loading changes from true to false, initialize chart
+      if (oldVal && !newVal) {
+        this.$nextTick(() => {
+          setTimeout(() => {
+            this.initChart();
+          }, 100); // Small delay to ensure DOM is fully rendered
+        });nter gap-3">
         <router-link
           to="/student/feedback"
           class="btn btn-info"
@@ -32,6 +38,20 @@
           :show-class-rankings="true"
           :is-own-ranking="true"
         />
+      </div>
+    </div>
+
+    <!-- Notifications Row -->
+    <div class="row">
+      <div class="col-md-12 mb-4">
+        <div class="card">
+          <div class="card-body">
+            <NotificationPanel 
+              :user-id="getUser.id"
+              @notification-clicked="handleNotificationClick"
+            />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -221,11 +241,13 @@
 import { mapGetters } from "vuex";
 import Chart from "chart.js/auto";
 import StudentRanking from '@/components/rankings/StudentRanking.vue';
+import NotificationPanel from '@/components/notifications/NotificationPanel.vue';
 
 export default {
   name: "StudentDashboard",
   components: {
-    StudentRanking
+    StudentRanking,
+    NotificationPanel
   },
   data() {
     return {
@@ -321,6 +343,13 @@ export default {
   mounted() {
     this.loadData();
   },
+  beforeUnmount() {
+    // Clean up chart to prevent memory leaks
+    if (this.performanceChart) {
+      this.performanceChart.destroy();
+      this.performanceChart = null;
+    }
+  },
   methods: {
     async loadData() {
       try {
@@ -375,19 +404,21 @@ export default {
     },
 
     initChart() {
-      const ctx = document.getElementById("performanceChart");
-      
-      // Check if canvas element exists
-      if (!ctx) {
-        console.warn("Performance chart canvas not found, skipping chart initialization");
-        return;
-      }
-
-      if (this.performanceChart) {
-        this.performanceChart.destroy();
-      }
-
       try {
+        const ctx = document.getElementById("performanceChart");
+        
+        // Check if canvas element exists
+        if (!ctx) {
+          console.warn("Performance chart canvas not found, skipping chart initialization");
+          return;
+        }
+
+        // Destroy existing chart to prevent conflicts
+        if (this.performanceChart) {
+          this.performanceChart.destroy();
+          this.performanceChart = null;
+        }
+
         // Sample data for the chart
         this.performanceChart = new Chart(ctx, {
         type: "line",
@@ -458,6 +489,31 @@ export default {
       if (confirm("Are you sure you want to logout?")) {
         this.$store.dispatch("auth/logout");
         this.$router.push("/login");
+      }
+    },
+
+    handleNotificationClick(notification) {
+      // Handle different notification types
+      switch (notification.type) {
+        case 'mark':
+          // Navigate to course marks if related_id is a course_id
+          if (notification.related_id) {
+            this.$router.push(`/student/course/${notification.related_id}`);
+          }
+          break;
+        case 'course':
+          // Navigate to course details
+          if (notification.related_id) {
+            this.$router.push(`/student/course/${notification.related_id}`);
+          }
+          break;
+        default:
+          // Show notification content as a toast for other types
+          this.$store.dispatch('showToast', {
+            message: notification.content,
+            type: 'info',
+            timeout: 8000
+          });
       }
     },
   },

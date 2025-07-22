@@ -104,7 +104,7 @@ function getCourseBreakdown($pdo)
         // Get all assessments for the course - now using component types
         $components = [
             ['type' => 'assignment', 'name' => 'Assignment', 'weightage' => 25, 'max_mark' => 100],
-            ['type' => 'quiz', 'name' => 'Quiz', 'weightage' => 20, 'max_mark' => 100], 
+            ['type' => 'quiz', 'name' => 'Quiz', 'weightage' => 20, 'max_mark' => 100],
             ['type' => 'test', 'name' => 'Test', 'weightage' => 25, 'max_mark' => 100],
             ['type' => 'final_exam', 'name' => 'Final Exam', 'weightage' => 30, 'max_mark' => 100]
         ];
@@ -165,7 +165,7 @@ function getCourseBreakdown($pdo)
                     'weighted' => ($student['final_exam_percentage'] ?? 0) * 0.30
                 ]
             ];
-            
+
             $student['finalMark'] = $student['final_grade'] ?? 0;
             $student['grade'] = $student['letter_grade'] ?? 'F';
         }
@@ -391,7 +391,7 @@ function getStudentBreakdown($pdo)
             $minScore = min($componentScores);
             $trends['strongest_component'] = array_search($maxScore, $componentScores);
             $trends['weakest_component'] = array_search($minScore, $componentScores);
-            
+
             foreach ($componentScores as $type => $score) {
                 if ($score < 60) {
                     $trends['improvement_needed'][] = $type;
@@ -619,7 +619,7 @@ function getAssessmentAnalytics($pdo)
 
             $markColumn = $component . '_mark';
             $percentageColumn = $component . '_percentage';
-            
+
             $analyticsStmt = $pdo->prepare("
                 SELECT 
                     '$component' as component_type,

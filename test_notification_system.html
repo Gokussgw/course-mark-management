@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Notification System</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 3px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        button { margin: 5px; padding: 10px 15px; cursor: pointer; }
+        .endpoint { font-family: monospace; background: #f8f9fa; padding: 5px; margin: 5px 0; }
+        pre { background: #f8f9fa; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Test Notification System for Mark Updates</h1>
+    
+    <div class="section">
+        <h2>1. Test Mark Update with Notifications</h2>
+        <div class="endpoint">POST http://localhost:8080/marks-api.php</div>
+        <p>This will save marks for a student and automatically send notifications to both student and lecturer.</p>
+        <button onclick="testMarkUpdateWithNotifications()">Test Mark Update with Notifications</button>
+        <div id="mark-update-result" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Test Course Announcement</h2>
+        <div class="endpoint">POST http://localhost:8080/marks-api.php</div>
+        <p>Send a course announcement to all students in a course.</p>
+        <button onclick="testCourseAnnouncement()">Test Course Announcement</button>
+        <div id="announcement-result" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Test Notification Retrieval</h2>
+        <div class="endpoint">GET http://localhost:8080/marks-api.php?action=recent_notifications</div>
+        <p>Get recent notifications for a user.</p>
+        <button onclick="testGetNotifications()">Test Get Notifications (Student)</button>
+        <button onclick="testGetNotificationsLecturer()">Test Get Notifications (Lecturer)</button>
+        <div id="notifications-result" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>4. Test Unread Count</h2>
+        <div class="endpoint">GET http://localhost:8080/marks-api.php?action=unread_notifications</div>
+        <p>Get unread notification count for a user.</p>
+        <button onclick="testUnreadCount()">Test Unread Count (Student)</button>
+        <div id="unread-result" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>5. Frontend Integration Test</h2>
+        <p>Test the notification panel component in the actual frontend.</p>
+        <button onclick="openFrontendDashboard()">Open Lecturer Dashboard</button>
+        <button onclick="openStudentDashboard()">Open Student Dashboard</button>
+        <div class="result">
+            <strong>What to look for:</strong>
+            <ul>
+                <li>Notification bell icon with unread count badge</li>
+                <li>Recent notifications in the dashboard</li>
+                <li>Ability to send course announcements from lecturer dashboard</li>
+                <li>Mark update notifications when marks are saved</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+
+        // Test helper function to login first
+        async function ensureLoggedIn() {
+            if (currentUser) return currentUser;
+            
+            try {
+                const response = await fetch('http://localhost:8080/db-api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        email: 'lecturer1@example.com',
+                        password: 'password'
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    currentUser = data.user;
+                    return currentUser;
+                } else {
+                    throw new Error('Login failed');
+                }
+            } catch (error) {
+                throw new Error('Login error: ' + error.message);
+            }
+        }
+
+        async function testMarkUpdateWithNotifications() {
+            const resultDiv = document.getElementById('mark-update-result');
+            resultDiv.innerHTML = '<p>Testing mark update with notifications...</p>';
+
+            try {
+                const user = await ensureLoggedIn();
+                
+                // Update marks for student ID 4 in course ID 1
+                const response = await fetch('http://localhost:8080/marks-api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        action: 'save_marks',
+                        student_id: 4,
+                        course_id: 1,
+                        lecturer_id: user.id,
+                        marks: {
+                            assignment: 85,
+                            quiz: 78,
+                            test: 82,
+                            final_exam: 88
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✓ Mark Update Successful</div>
+                        <p><strong>Notifications Sent:</strong> ${data.notifications_sent ? 'Yes' : 'No'}</p>
+                        <p><strong>Notification Count:</strong> ${data.notification_count || 0}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">✗ Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">✗ Request Failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testCourseAnnouncement() {
+            const resultDiv = document.getElementById('announcement-result');
+            resultDiv.innerHTML = '<p>Testing course announcement...</p>';
+
+            try {
+                const user = await ensureLoggedIn();
+                
+                const response = await fetch('http://localhost:8080/marks-api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        action: 'send_course_announcement',
+                        course_id: 1,
+                        lecturer_id: user.id,
+                        title: 'Test Announcement - Mark Updates Available',
+                        message: 'Dear Students,\\n\\nNew marks have been released for recent assessments. Please check your academic dashboard to view your updated results.\\n\\nIf you have any questions about your marks, please feel free to contact me during office hours.\\n\\nBest regards,\\nYour Lecturer',
+                        include_marks: true
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✓ Course Announcement Sent</div>
+                        <p><strong>Students Notified:</strong> ${data.notifications_sent}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">✗ Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">✗ Request Failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testGetNotifications() {
+            const resultDiv = document.getElementById('notifications-result');
+            resultDiv.innerHTML = '<p>Testing notification retrieval for student...</p>';
+
+            try {
+                // Use student ID 4 (should have notifications from mark updates)
+                const response = await fetch('http://localhost:8080/marks-api.php?action=recent_notifications&user_id=4&limit=5', {
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+                
+                if (data.notifications) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✓ Notifications Retrieved</div>
+                        <p><strong>Notification Count:</strong> ${data.notifications.length}</p>
+                        <h4>Recent Notifications:</h4>
+                        <pre>${JSON.stringify(data.notifications, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">✗ Error: ${data.error || 'No notifications data'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">✗ Request Failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testGetNotificationsLecturer() {
+            const resultDiv = document.getElementById('notifications-result');
+            resultDiv.innerHTML = '<p>Testing notification retrieval for lecturer...</p>';
+
+            try {
+                const user = await ensureLoggedIn();
+                
+                const response = await fetch(`http://localhost:8080/marks-api.php?action=recent_notifications&user_id=${user.id}&limit=5`, {
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+                
+                if (data.notifications) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✓ Lecturer Notifications Retrieved</div>
+                        <p><strong>Notification Count:</strong> ${data.notifications.length}</p>
+                        <h4>Recent Notifications:</h4>
+                        <pre>${JSON.stringify(data.notifications, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">✗ Error: ${data.error || 'No notifications data'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">✗ Request Failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testUnreadCount() {
+            const resultDiv = document.getElementById('unread-result');
+            resultDiv.innerHTML = '<p>Testing unread count...</p>';
+
+            try {
+                // Use student ID 4
+                const response = await fetch('http://localhost:8080/marks-api.php?action=unread_notifications&user_id=4', {
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+                
+                if (data.unread_count !== undefined) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✓ Unread Count Retrieved</div>
+                        <p><strong>Unread Notifications:</strong> ${data.unread_count}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">✗ Error: ${data.error || 'No unread count data'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">✗ Request Failed: ${error.message}</div>`;
+            }
+        }
+
+        function openFrontendDashboard() {
+            window.open('http://localhost:8081/lecturer/dashboard', '_blank');
+        }
+
+        function openStudentDashboard() {
+            window.open('http://localhost:8081/student/dashboard', '_blank');
+        }
+
+        // Auto-run basic test on page load
+        window.onload = function() {
+            console.log('Notification system test page loaded');
+        };
+    </script>
+</body>
+</html>

@@ -12,6 +12,10 @@ header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Access-Control-Allow-Credentials: true');
 
+// Include notification utilities
+require_once __DIR__ . '/src/utils/NotificationUtils.php';
+header('Access-Control-Allow-Credentials: true');
+
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
@@ -78,6 +82,12 @@ function handleGet()
             break;
         case 'export_marks_csv':
             exportMarksCSV();
+            break;
+        case 'unread_notifications':
+            getUnreadNotificationCountAPI();
+            break;
+        case 'recent_notifications':
+            getRecentUserNotifications();
             break;
         default:
             http_response_code(400);
@@ -276,6 +286,9 @@ function handlePost()
         case 'calculate_final_marks':
             calculateFinalMarks();
             break;
+        case 'send_course_announcement':
+            sendCourseAnnouncement();
+            break;
         default:
             http_response_code(400);
             echo json_encode(['error' => 'Invalid action']);
@@ -383,8 +396,48 @@ function saveStudentMarks()
             $gpa
         ]);
 
+        // Send notifications for mark updates
+        $notificationsSent = 0;
+        $components = [
+            'assignment' => $assignment_mark,
+            'quiz' => $quiz_mark,
+            'test' => $test_mark,
+            'final_exam' => $final_exam_mark
+        ];
+
+        // Check if this is an update (get existing marks first)
+        $existingStmt = $pdo->prepare("
+            SELECT assignment_mark, quiz_mark, test_mark, final_exam_mark 
+            FROM final_marks_custom 
+            WHERE student_id = ? AND course_id = ?
+        ");
+        $existingStmt->execute([$student_id, $course_id]);
+        $existing = $existingStmt->fetch();
+
+        // Send notifications for updated components
+        foreach ($components as $componentType => $newMark) {
+            if ($newMark > 0) { // Only notify if mark is actually set
+                $existingMark = 0;
+                if ($existing) {
+                    $existingMark = $existing[$componentType . '_mark'] ?? 0;
+                }
+                
+                // Send notification if this is a new mark or if the mark changed significantly
+                if (!$existing || abs($newMark - $existingMark) > 1) {
+                    if (sendMarkUpdateNotification($pdo, $course_id, $student_id, $lecturer_id, $componentType, $newMark)) {
+                        $notificationsSent++;
+                    }
+                }
+            }
+        }
+
         $pdo->commit();
-        echo json_encode(['success' => true, 'message' => 'Marks saved successfully']);
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Marks saved successfully',
+            'notifications_sent' => $notificationsSent > 0,
+            'notification_count' => $notificationsSent
+        ]);
     } catch (PDOException $e) {
         $pdo->rollBack();
         http_response_code(500);
@@ -678,3 +731,68 @@ function exportMarksCSV()
         echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
     }
 }
+
+function getUnreadNotificationCountAPI()
+{
+    global $pdo;
+    
+    $user_id = $_GET['user_id'] ?? null;
+    
+    if (!$user_id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'User ID required']);
+        return;
+    }
+    
+    $count = getUnreadNotificationCount($pdo, $user_id);
+    echo json_encode(['unread_count' => $count]);
+}
+
+function getRecentUserNotifications()
+{
+    global $pdo;
+    
+    $user_id = $_GET['user_id'] ?? null;
+    $limit = intval($_GET['limit'] ?? 10);
+    
+    if (!$user_id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'User ID required']);
+        return;
+    }
+    
+    $notifications = getRecentNotifications($pdo, $user_id, $limit);
+    echo json_encode(['notifications' => $notifications]);
+}
+
+function sendCourseAnnouncement()
+{
+    global $pdo, $request;
+    
+    $course_id = $request['course_id'] ?? null;
+    $lecturer_id = $request['lecturer_id'] ?? null;
+    $title = $request['title'] ?? '';
+    $message = $request['message'] ?? '';
+    $include_marks = $request['include_marks'] ?? false;
+    
+    if (!$course_id || !$lecturer_id || !$title || !$message) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Course ID, Lecturer ID, title, and message required']);
+        return;
+    }
+    
+    $notificationsSent = sendCourseAnnouncementNotification($pdo, $course_id, $lecturer_id, $title, $message, $include_marks);
+    
+    if ($notificationsSent !== false) {
+        echo json_encode([
+            'success' => true,
+            'message' => 'Course announcement sent successfully',
+            'notifications_sent' => $notificationsSent
+        ]);
+    } else {
+        http_response_code(500);
+        echo json_encode(['error' => 'Failed to send course announcement']);
+    }
+}
+
+?>
