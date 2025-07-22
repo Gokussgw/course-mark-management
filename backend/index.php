@@ -85,8 +85,17 @@ $app = AppFactory::create();
 // Add CORS middleware (must be added before other middleware)
 $app->add(function ($request, $handler) {
     $response = $handler->handle($request);
+    $origin = $request->getHeaderLine('Origin');
+
+    // Allow any localhost port
+    if (preg_match('/^http:\/\/localhost:\d+$/', $origin)) {
+        $allowedOrigin = $origin;
+    } else {
+        $allowedOrigin = 'http://localhost:3000'; // fallback
+    }
+
     return $response
-        ->withHeader('Access-Control-Allow-Origin', 'http://localhost:8082')
+        ->withHeader('Access-Control-Allow-Origin', $allowedOrigin)
         ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
         ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
         ->withHeader('Access-Control-Allow-Credentials', 'true');
@@ -100,8 +109,17 @@ $app->addBodyParsingMiddleware();
 
 // Handle preflight requests
 $app->options('/{routes:.+}', function (Request $request, Response $response) {
+    $origin = $request->getHeaderLine('Origin');
+
+    // Allow any localhost port
+    if (preg_match('/^http:\/\/localhost:\d+$/', $origin)) {
+        $allowedOrigin = $origin;
+    } else {
+        $allowedOrigin = 'http://localhost:3000'; // fallback
+    }
+
     return $response
-        ->withHeader('Access-Control-Allow-Origin', 'http://localhost:8082')
+        ->withHeader('Access-Control-Allow-Origin', $allowedOrigin)
         ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
         ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
         ->withHeader('Access-Control-Allow-Credentials', 'true');
