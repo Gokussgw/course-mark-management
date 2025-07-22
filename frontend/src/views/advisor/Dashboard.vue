@@ -7,6 +7,13 @@
       <h1 class="mb-0">Academic Advisor Dashboard</h1>
       <div class="d-flex align-items-center gap-3">
         <router-link
+          to="/advisor/advisee-reports"
+          class="btn btn-primary"
+          title="Comprehensive Advisee Reports"
+        >
+          <i class="fas fa-file-alt me-2"></i>Advisee Reports
+        </router-link>
+        <router-link
           to="/advisor/feedback"
           class="btn btn-info"
           title="Advisee Feedback"

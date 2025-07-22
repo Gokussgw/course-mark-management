@@ -101,6 +101,9 @@ function handleGet()
         case 'student_dashboard_performance':
             getStudentDashboardPerformance();
             break;
+        case 'student_course_detail':
+            getStudentCourseDetail();
+            break;
         default:
             http_response_code(400);
             echo json_encode(['error' => 'Invalid action']);
@@ -1015,6 +1018,129 @@ function getStudentDashboardPerformance()
         }
         
         echo json_encode(['performance' => $chartData]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+    }
+}
+
+function getStudentCourseDetail()
+{
+    global $pdo;
+    
+    $student_id = $_GET['student_id'] ?? null;
+    $course_id = $_GET['course_id'] ?? null;
+    
+    if (!$student_id || !$course_id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Student ID and Course ID required']);
+        return;
+    }
+    
+    try {
+        // Get course details and enrollment verification
+        $courseStmt = $pdo->prepare("
+            SELECT 
+                c.id,
+                c.code,
+                c.name,
+                c.semester,
+                c.academic_year,
+                u.name as lecturer_name,
+                u.email as lecturer_email,
+                e.id as enrollment_id
+            FROM courses c
+            LEFT JOIN users u ON c.lecturer_id = u.id
+            LEFT JOIN enrollments e ON e.course_id = c.id AND e.student_id = ?
+            WHERE c.id = ?
+        ");
+        $courseStmt->execute([$student_id, $course_id]);
+        $course = $courseStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$course || !$course['enrollment_id']) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Course not found or student not enrolled']);
+            return;
+        }
+        
+        // Get student's marks for this course
+        $marksStmt = $pdo->prepare("
+            SELECT 
+                assignment_mark,
+                quiz_mark,
+                test_mark,
+                final_exam_mark,
+                component_total,
+                final_grade,
+                letter_grade,
+                gpa,
+                updated_at
+            FROM final_marks_custom
+            WHERE student_id = ? AND course_id = ?
+        ");
+        $marksStmt->execute([$student_id, $course_id]);
+        $marks = $marksStmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Get assessments for this course
+        $assessmentsStmt = $pdo->prepare("
+            SELECT 
+                id,
+                name,
+                type,
+                weightage,
+                date,
+                description
+            FROM assessments
+            WHERE course_id = ?
+            ORDER BY date ASC
+        ");
+        $assessmentsStmt->execute([$course_id]);
+        $assessments = $assessmentsStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get student's ranking in this course
+        $rankStmt = $pdo->prepare("
+            SELECT 
+                COUNT(*) + 1 as rank,
+                total_students.total
+            FROM final_marks_custom fm1
+            CROSS JOIN (
+                SELECT COUNT(DISTINCT student_id) as total
+                FROM final_marks_custom
+                WHERE course_id = ?
+            ) total_students
+            WHERE fm1.course_id = ? 
+            AND fm1.final_grade > COALESCE((
+                SELECT final_grade
+                FROM final_marks_custom
+                WHERE student_id = ? AND course_id = ?
+            ), 0)
+        ");
+        $rankStmt->execute([$course_id, $course_id, $student_id, $course_id]);
+        $rankData = $rankStmt->fetch();
+        
+        // Format the response
+        $response = [
+            'course' => $course,
+            'marks' => $marks ?: [
+                'assignment_mark' => null,
+                'quiz_mark' => null,
+                'test_mark' => null,
+                'final_exam_mark' => null,
+                'component_total' => null,
+                'final_grade' => null,
+                'letter_grade' => null,
+                'gpa' => null,
+                'updated_at' => null
+            ],
+            'assessments' => $assessments,
+            'ranking' => $rankData ? [
+                'position' => $rankData['rank'],
+                'total_students' => $rankData['total'],
+                'rank_text' => $rankData['rank'] . '/' . $rankData['total']
+            ] : null
+        ];
+        
+        echo json_encode($response);
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);

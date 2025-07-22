@@ -30,6 +30,10 @@
       </div>
     </div>
 
+    <div v-else-if="error" class="alert alert-danger">
+      {{ error }}
+    </div>
+
     <div v-else-if="!course" class="alert alert-danger">
       Course not found or you don't have access to this course.
     </div>
@@ -61,56 +65,46 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="assessment in sortedAssessments" :key="assessment.id">
+                  <tr v-for="assessment in sortedAssessments" :key="assessment.assessment_type">
                     <td>
-                      <strong>{{ assessment.name }}</strong>
+                      <strong>{{ assessment.assessment_type }}</strong>
                     </td>
                     <td>
-                      <span class="badge" :class="getAssessmentTypeBadgeClass(assessment.type)">
-                        {{ assessment.type }}
+                      <span class="badge" :class="getAssessmentTypeBadgeClass(assessment.assessment_type)">
+                        {{ assessment.assessment_type }}
                       </span>
                     </td>
                     <td>{{ assessment.weightage }}%</td>
                     <td>
                       <span 
                         class="badge" 
-                        :class="getStatusBadge(assessment)"
+                        :class="assessment.mark_id ? 'bg-success' : 'bg-secondary'"
                       >
-                        {{ getAssessmentStatus(assessment) }}
+                        {{ assessment.mark_id ? 'Completed' : 'Pending' }}
                       </span>
                     </td>
                     <td style="width: 180px;">
-                      <div v-if="hasMarkForAssessment(assessment.id) && !isSimulatedAssessment(assessment.id)">
-                        <div class="input-group input-group-sm disabled">
-                          <input 
-                            type="number" 
-                            class="form-control bg-light"
-                            :value="getMarkForAssessment(assessment.id).mark"
-                            disabled
-                          >
-                          <span class="input-group-text">/ {{ assessment.max_mark }}</span>
-                        </div>
-                        <small class="text-muted">Actual mark ({{ calculatePercentage(getMarkForAssessment(assessment.id).mark, assessment.max_mark) }}%)</small>
+                      <div class="input-group input-group-sm">
+                        <input 
+                          type="number" 
+                          class="form-control"
+                          v-model.number="simulatedMarks[assessment.assessment_type]"
+                          :min="0" 
+                          :max="assessment.max_mark"
+                          :placeholder="assessment.mark || 'Enter mark'"
+                          @input="updateSimulatedMark(assessment.assessment_type, $event.target.value)"
+                        >
+                        <span class="input-group-text">/ {{ assessment.max_mark }}</span>
                       </div>
-                      <div v-else>
-                        <div class="input-group input-group-sm">
-                          <input 
-                            type="number" 
-                            class="form-control"
-                            v-model.number="simulatedMarks[assessment.id]"
-                            :min="0" 
-                            :max="assessment.max_mark"
-                            @input="updateSimulation"
-                          >
-                          <span class="input-group-text">/ {{ assessment.max_mark }}</span>
-                        </div>
-                        <small class="text-muted" v-if="simulatedMarks[assessment.id] !== undefined">
-                          Simulated ({{ calculatePercentage(simulatedMarks[assessment.id], assessment.max_mark) }}%)
-                        </small>
-                        <small class="text-muted" v-else>
-                          Enter expected mark
-                        </small>
-                      </div>
+                      <small class="text-muted" v-if="assessment.mark_id && simulatedMarks[assessment.assessment_type] === null">
+                        Current: {{ assessment.mark }} ({{ calculatePercentage(parseFloat(assessment.mark), parseFloat(assessment.max_mark)) }}%)
+                      </small>
+                      <small class="text-muted" v-else-if="simulatedMarks[assessment.assessment_type] !== null && simulatedMarks[assessment.assessment_type] !== undefined">
+                        Simulated ({{ calculatePercentage(simulatedMarks[assessment.assessment_type], parseFloat(assessment.max_mark)) }}%)
+                      </small>
+                      <small class="text-muted" v-else>
+                        {{ assessment.mark_id ? 'Override current mark' : 'Enter expected mark' }}
+                      </small>
                     </td>
                   </tr>
                 </tbody>
@@ -118,8 +112,8 @@
             </div>
 
             <div class="d-flex justify-content-end mt-3">
-              <button class="btn btn-outline-secondary me-2" @click="resetSimulation">
-                Reset Simulation
+              <button class="btn btn-outline-secondary me-2" @click="clearSimulation">
+                Clear Simulation
               </button>
               <div class="dropdown">
                 <button 
@@ -185,11 +179,28 @@
                 aria-valuemin="0" 
                 aria-valuemax="100">
               </div>
+              <div 
+                class="progress-bar bg-warning" 
+                role="progressbar" 
+                :style="`width: 20%`"
+                aria-valuenow="20" 
+                aria-valuemin="0" 
+                aria-valuemax="100">
+              </div>
+              <div 
+                class="progress-bar bg-success" 
+                role="progressbar" 
+                :style="`width: 30%`"
+                aria-valuenow="30" 
+                aria-valuemin="0" 
+                aria-valuemax="100">
+              </div>
             </div>
             <div class="d-flex justify-content-between">
-              <small>Fail</small>
-              <small>Pass</small>
-              <small>Distinction</small>
+              <small>0%</small>
+              <small>50% (Pass)</small>
+              <small>70% (Distinction)</small>
+              <small>100%</small>
             </div>
             
             <div 
@@ -209,6 +220,27 @@
             <p class="text-muted small mb-3">
               Marks required on remaining assessments to achieve these grades:
             </p>
+            
+            <div class="required-mark-row">
+              <div class="d-flex justify-content-between mb-2">
+                <span class="badge bg-warning">A+ Grade (80%+)</span>
+                <span 
+                  :class="{ 'text-success': requiredMarks.a_grade <= 100, 'text-danger': requiredMarks.a_grade > 100 }"
+                >
+                  {{ formatRequiredMark(requiredMarks.a_grade) }}
+                </span>
+              </div>
+              <div class="progress mb-3" style="height: 8px;">
+                <div 
+                  class="progress-bar bg-warning" 
+                  role="progressbar" 
+                  :style="`width: ${Math.min(requiredMarks.a_grade, 100)}%`"
+                  :aria-valuenow="Math.min(requiredMarks.a_grade, 100)"
+                  aria-valuemin="0" 
+                  aria-valuemax="100">
+                </div>
+              </div>
+            </div>
             
             <div class="required-mark-row">
               <div class="d-flex justify-content-between mb-2">
@@ -233,7 +265,7 @@
             
             <div class="required-mark-row">
               <div class="d-flex justify-content-between mb-2">
-                <span class="badge bg-warning">Pass (50%+)</span>
+                <span class="badge bg-primary">Pass (50%+)</span>
                 <span
                   :class="{ 'text-success': requiredMarks.pass <= 100, 'text-danger': requiredMarks.pass > 100 }"
                 >
@@ -242,7 +274,7 @@
               </div>
               <div class="progress mb-3" style="height: 8px;">
                 <div 
-                  class="progress-bar bg-warning" 
+                  class="progress-bar bg-primary" 
                   role="progressbar" 
                   :style="`width: ${Math.min(requiredMarks.pass, 100)}%`"
                   :aria-valuenow="Math.min(requiredMarks.pass, 100)"
@@ -264,101 +296,56 @@
 </template>
 
 <script>
-import { mapState, mapGetters, mapActions } from 'vuex'
+import { mapGetters } from 'vuex'
 
 export default {
   name: 'MarkSimulation',
   data() {
     return {
       courseId: null,
-      simulatedMarks: {}, // assessment_id -> simulated_mark
+      isLoading: true,
+      course: null,
+      assessments: [],
+      performance: null,
+      simulatedMarks: {}, // assessment_type -> simulated_mark
       requiredMarks: {
         pass: 0,
-        distinction: 0
-      }
+        distinction: 0,
+        a_grade: 0
+      },
+      error: null
     }
   },
   computed: {
-    ...mapState({
-      isLoading: state => state.loading,
-      course: state => state.courses.course,
-      marks: state => state.marks.marks,
-      userId: state => state.auth.userId
-    }),
-    ...mapGetters({
-      getCourseAssessments: 'assessments/getCourseAssessments'
-    }),
-    courseAssessments() {
-      return this.getCourseAssessments(this.courseId) || [];
+    ...mapGetters("auth", ["getUser"]),
+    userId() {
+      return this.getUser ? this.getUser.id : null;
     },
     sortedAssessments() {
-      return [...this.courseAssessments].sort((a, b) => {
-        // Sort by due date
-        if (!a.due_date) return 1;
-        if (!b.due_date) return -1;
-        return new Date(a.due_date) - new Date(b.due_date);
+      return [...this.assessments].sort((a, b) => {
+        // Sort by weightage (highest first)
+        return b.weightage - a.weightage;
       });
-    },
-    studentMarks() {
-      return this.marks.filter(mark => 
-        mark.student_id === this.userId && 
-        mark.course_id === parseInt(this.courseId)
-      );
-    },
-    unassessedItems() {
-      return this.courseAssessments.filter(assessment => 
-        !this.hasMarkForAssessment(assessment.id)
-      );
-    },
-    totalRemainingWeight() {
-      return this.unassessedItems.reduce((sum, assessment) => sum + assessment.weightage, 0);
     },
     currentOverallMark() {
-      if (!this.studentMarks.length) return 0;
-      
-      let weightedSum = 0;
-      let totalWeight = 0;
-      
-      this.studentMarks.forEach(mark => {
-        const assessment = this.courseAssessments.find(a => a.id === mark.assessment_id);
-        if (!assessment) return;
-        
-        const percentage = this.calculatePercentage(mark.mark, assessment.max_mark);
-        weightedSum += percentage * assessment.weightage;
-        totalWeight += parseInt(assessment.weightage);
-      });
-      
-      if (totalWeight === 0) return 0;
-      return Math.round(weightedSum / totalWeight);
+      return this.performance ? this.performance.overall_percentage : 0;
     },
     simulatedOverallMark() {
       let weightedSum = 0;
       let totalWeight = 0;
       
-      // Include actual marks
-      this.studentMarks.forEach(mark => {
-        // Skip if this assessment is being simulated
-        if (this.isSimulatedAssessment(mark.assessment_id)) return;
+      this.assessments.forEach(assessment => {
+        const simulatedMark = this.simulatedMarks[assessment.assessment_type];
+        const actualMark = parseFloat(assessment.mark) || 0;
+        const weight = parseFloat(assessment.weightage);
         
-        const assessment = this.courseAssessments.find(a => a.id === mark.assessment_id);
-        if (!assessment) return;
+        // Use simulated mark if it has a value, otherwise use actual mark
+        const markToUse = (simulatedMark !== null && simulatedMark !== undefined) ? simulatedMark : actualMark;
         
-        const percentage = this.calculatePercentage(mark.mark, assessment.max_mark);
-        weightedSum += percentage * assessment.weightage;
-        totalWeight += parseInt(assessment.weightage);
+        const percentage = this.calculatePercentage(markToUse, parseFloat(assessment.max_mark));
+        weightedSum += percentage * weight;
+        totalWeight += weight;
       });
-      
-      // Include simulated marks
-      for (const assessmentId in this.simulatedMarks) {
-        const mark = this.simulatedMarks[assessmentId];
-        const assessment = this.courseAssessments.find(a => a.id === parseInt(assessmentId));
-        
-        if (!assessment || mark === undefined) continue;
-        
-        const percentage = this.calculatePercentage(mark, assessment.max_mark);
-        weightedSum += percentage * assessment.weightage;
-        totalWeight += parseInt(assessment.weightage);
-      }
       
       if (totalWeight === 0) return 0;
       return Math.round(weightedSum / totalWeight);
@@ -366,243 +353,263 @@ export default {
     simulatedGrade() {
       return this.calculateGrade(this.simulatedOverallMark);
     },
+    simulatedGPA() {
+      return this.calculateGPA(this.simulatedOverallMark);
+    },
     markChange() {
       return this.simulatedOverallMark - this.currentOverallMark;
     },
     getSimulatedMarkClass() {
-      if (this.simulatedOverallMark >= 70) return 'text-success';
-      if (this.simulatedOverallMark >= 50) return 'text-warning';
+      if (this.simulatedOverallMark >= 80) return 'text-success';
+      if (this.simulatedOverallMark >= 70) return 'text-primary';
+      if (this.simulatedOverallMark >= 60) return 'text-warning';
       return 'text-danger';
     },
     getSimulatedGradeBadgeClass() {
-      if (this.simulatedOverallMark >= 70) return 'bg-success';
-      if (this.simulatedOverallMark >= 50) return 'bg-warning';
+      const grade = this.simulatedGrade;
+      if (['A+', 'A', 'A-'].includes(grade)) return 'bg-success';
+      if (['B+', 'B', 'B-'].includes(grade)) return 'bg-primary';
+      if (['C+', 'C', 'C-'].includes(grade)) return 'bg-warning';
+      if (['D+', 'D'].includes(grade)) return 'bg-orange';
       return 'bg-danger';
     },
     getCurrentMarkClass() {
-      if (this.currentOverallMark >= 70) return 'text-success';
-      if (this.currentOverallMark >= 50) return 'text-warning';
+      if (this.currentOverallMark >= 80) return 'text-success';
+      if (this.currentOverallMark >= 70) return 'text-primary';
+      if (this.currentOverallMark >= 60) return 'text-warning';
       return 'text-danger';
     },
     getMarkChangeClass() {
       if (this.markChange > 0) return 'text-success';
       if (this.markChange < 0) return 'text-danger';
       return 'text-muted';
+    },
+    unassessedItems() {
+      return this.assessments.filter(assessment => 
+        assessment.mark_id === null
+      );
+    },
+    totalRemainingWeight() {
+      return this.unassessedItems.reduce((sum, assessment) => 
+        sum + parseFloat(assessment.weightage), 0
+      );
     }
   },
   async created() {
     this.courseId = parseInt(this.$route.params.id);
     
-    try {
-      // Fetch course details
-      await this.fetchCourse(this.courseId);
-      
-      // Fetch assessments for this course
-      await this.fetchAssessments({ courseId: this.courseId });
-      
-      // Fetch marks for this student in this course
-      await this.fetchMarks({ 
-        studentId: this.userId,
-        courseId: this.courseId
-      });
-      
-      // Initialize the simulation
-      this.initializeSimulation();
-      
-      // Calculate required marks
-      this.calculateRequiredMarks();
-    } catch (error) {
-      console.error('Error loading simulation data:', error);
-    }
+    console.log('MarkSimulation created, getUser:', this.getUser);
+    
+    // Wait a bit for authentication to be ready, then try to load data
+    setTimeout(() => {
+      console.log('After timeout, getUser:', this.getUser);
+      if (this.getUser) {
+        this.loadCourseData();
+      } else {
+        this.error = 'Please log in to access the grade simulator';
+        this.isLoading = false;
+      }
+    }, 100);
   },
   methods: {
-    ...mapActions({
-      fetchCourse: 'courses/fetchCourse',
-      fetchAssessments: 'assessments/fetchAssessments',
-      fetchMarks: 'marks/fetchMarks'
-    }),
-    formatDate(dateString) {
-      if (!dateString) return 'Not set';
-      return new Date(dateString).toLocaleDateString();
+    async loadCourseData() {
+      this.isLoading = true;
+      this.error = null;
+      
+      if (!this.userId) {
+        this.error = 'User not authenticated';
+        this.isLoading = false;
+        return;
+      }
+      
+      try {
+        const requestData = {
+          student_id: this.userId,
+          course_id: this.courseId
+        };
+        
+        const response = await fetch('http://localhost:8000/api/marks/student_course_detail', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.success) {
+          this.course = data.course;
+          this.assessments = data.assessments;
+          this.performance = data.performance;
+          
+          // Initialize simulation
+          this.initializeSimulation();
+          this.calculateRequiredMarks();
+        } else {
+          this.error = data.error || 'Failed to load course data';
+        }
+      } catch (error) {
+        console.error('Error loading course data:', error);
+        this.error = 'Failed to load course data. Please try again later.';
+      } finally {
+        this.isLoading = false;
+      }
     },
-    hasMarkForAssessment(assessmentId) {
-      return this.studentMarks.some(mark => mark.assessment_id === parseInt(assessmentId));
+    initializeSimulation() {
+      // Initialize simulated marks for assessments
+      this.simulatedMarks = {};
+      this.assessments.forEach(assessment => {
+        // Allow simulation for all assessments to enable "what-if" scenarios
+        this.simulatedMarks[assessment.assessment_type] = null;
+      });
     },
-    getMarkForAssessment(assessmentId) {
-      return this.studentMarks.find(mark => mark.assessment_id === parseInt(assessmentId));
+    hasMarkForAssessment(assessmentType) {
+      const assessment = this.assessments.find(a => a.assessment_type === assessmentType);
+      return assessment && assessment.mark_id !== null;
     },
-    isSimulatedAssessment(assessmentId) {
-      return assessmentId in this.simulatedMarks;
+    isSimulatedAssessment(assessmentType) {
+      return assessmentType in this.simulatedMarks;
     },
     calculatePercentage(mark, maxMark) {
-      if (!maxMark) return 0;
+      if (!mark || !maxMark) return 0;
       return Math.round((mark / maxMark) * 100);
-    },
-    getAssessmentTypeBadgeClass(type) {
-      const types = {
-        'exam': 'bg-danger',
-        'midterm': 'bg-warning',
-        'quiz': 'bg-info',
-        'assignment': 'bg-success',
-        'project': 'bg-primary',
-        'lab': 'bg-secondary'
-      };
-      return types[type.toLowerCase()] || 'bg-secondary';
-    },
-    getAssessmentStatus(assessment) {
-      // Check if it has a real mark
-      if (this.hasMarkForAssessment(assessment.id) && !this.isSimulatedAssessment(assessment.id)) {
-        return 'Completed';
-      }
-      
-      // Check if it has a simulated mark
-      if (this.isSimulatedAssessment(assessment.id)) {
-        return 'Simulated';
-      }
-      
-      const today = new Date();
-      const dueDate = assessment.due_date ? new Date(assessment.due_date) : null;
-      
-      if (!dueDate) return 'Upcoming';
-      
-      if (dueDate < today) {
-        return 'Overdue';
-      }
-      
-      if (dueDate.getTime() - today.getTime() < 7 * 24 * 60 * 60 * 1000) {
-        return 'Upcoming';
-      }
-      
-      return 'Scheduled';
-    },
-    getStatusBadge(assessment) {
-      const status = this.getAssessmentStatus(assessment);
-      
-      const badges = {
-        'Completed': 'bg-success',
-        'Simulated': 'bg-info',
-        'Overdue': 'bg-danger',
-        'Upcoming': 'bg-warning',
-        'Scheduled': 'bg-secondary'
-      };
-      
-      return badges[status] || 'bg-secondary';
     },
     calculateGrade(percentage) {
       if (percentage >= 90) return 'A+';
-      if (percentage >= 80) return 'A';
+      if (percentage >= 85) return 'A';
+      if (percentage >= 80) return 'A-';
       if (percentage >= 75) return 'B+';
       if (percentage >= 70) return 'B';
-      if (percentage >= 65) return 'C+';
-      if (percentage >= 60) return 'C';
-      if (percentage >= 55) return 'D+';
-      if (percentage >= 50) return 'D';
+      if (percentage >= 65) return 'B-';
+      if (percentage >= 60) return 'C+';
+      if (percentage >= 55) return 'C';
+      if (percentage >= 50) return 'C-';
+      if (percentage >= 45) return 'D+';
+      if (percentage >= 40) return 'D';
       return 'F';
     },
-    initializeSimulation() {
-      this.simulatedMarks = {};
-      
-      // For assessments without marks, initialize with empty values
-      this.courseAssessments.forEach(assessment => {
-        if (!this.hasMarkForAssessment(assessment.id)) {
-          this.simulatedMarks[assessment.id] = undefined;
-        }
-      });
-    },
-    resetSimulation() {
-      this.initializeSimulation();
-      this.calculateRequiredMarks();
-    },
-    updateSimulation() {
-      this.calculateRequiredMarks();
+    calculateGPA(percentage) {
+      if (percentage >= 90) return 4.3;
+      if (percentage >= 85) return 4.0;
+      if (percentage >= 80) return 3.7;
+      if (percentage >= 75) return 3.3;
+      if (percentage >= 70) return 3.0;
+      if (percentage >= 65) return 2.7;
+      if (percentage >= 60) return 2.3;
+      if (percentage >= 55) return 2.0;
+      if (percentage >= 50) return 1.7;
+      if (percentage >= 45) return 1.3;
+      if (percentage >= 40) return 1.0;
+      return 0.0;
     },
     calculateRequiredMarks() {
-      // Calculate how much is needed on remaining assessments to achieve target grades
+      this.requiredMarks.pass = this.calculateRequiredMarkForGrade(50);
+      this.requiredMarks.distinction = this.calculateRequiredMarkForGrade(70);
+      this.requiredMarks.a_grade = this.calculateRequiredMarkForGrade(80);
+    },
+    calculateRequiredMarkForGrade(targetPercentage) {
+      // Calculate current assessed weight and marks from actual marks only
+      let assessedWeightedMarks = 0;
       
-      // First, get the current contribution from real and simulated marks
-      let currentWeightedSum = 0;
-      let assessedWeight = 0;
-      
-      // Include actual marks (that aren't being simulated)
-      this.studentMarks.forEach(mark => {
-        if (this.isSimulatedAssessment(mark.assessment_id)) return;
-        
-        const assessment = this.courseAssessments.find(a => a.id === mark.assessment_id);
-        if (!assessment) return;
-        
-        const percentage = this.calculatePercentage(mark.mark, assessment.max_mark);
-        currentWeightedSum += percentage * assessment.weightage;
-        assessedWeight += assessment.weightage;
-      });
-      
-      // Include simulated marks that have values
-      for (const assessmentId in this.simulatedMarks) {
-        const mark = this.simulatedMarks[assessmentId];
-        if (mark === undefined) continue;
-        
-        const assessment = this.courseAssessments.find(a => a.id === parseInt(assessmentId));
-        if (!assessment) continue;
-        
-        const percentage = this.calculatePercentage(mark, assessment.max_mark);
-        currentWeightedSum += percentage * assessment.weightage;
-        assessedWeight += assessment.weightage;
-      }
-      
-      // Calculate remaining unassessed weight
-      let unassessedWeight = 0;
-      this.courseAssessments.forEach(assessment => {
-        const assessmentId = assessment.id;
-        if (!this.hasMarkForAssessment(assessmentId) && 
-            !(assessmentId in this.simulatedMarks && this.simulatedMarks[assessmentId] !== undefined)) {
-          unassessedWeight += assessment.weightage;
+      this.assessments.forEach(assessment => {
+        // Only include assessments that have actual marks (not simulated)
+        if (assessment.mark_id !== null) {
+          const percentage = this.calculatePercentage(parseFloat(assessment.mark), parseFloat(assessment.max_mark));
+          assessedWeightedMarks += percentage * parseFloat(assessment.weightage);
         }
       });
       
-      // Calculate required marks for different grade thresholds
-      const totalWeight = 100; // Assuming total is 100%
+      // If no remaining assessments, return 0
+      if (this.totalRemainingWeight === 0) return 0;
       
-      // For passing grade (50%)
-      const requiredForPass = (50 * totalWeight - currentWeightedSum) / unassessedWeight;
-      this.requiredMarks.pass = unassessedWeight > 0 ? Math.round(requiredForPass) : 0;
+      // Calculate required weighted marks from remaining assessments
+      const totalRequiredWeightedMarks = targetPercentage * 100; // 100% total weight
+      const requiredFromRemaining = totalRequiredWeightedMarks - assessedWeightedMarks;
       
-      // For distinction grade (70%)
-      const requiredForDistinction = (70 * totalWeight - currentWeightedSum) / unassessedWeight;
-      this.requiredMarks.distinction = unassessedWeight > 0 ? Math.round(requiredForDistinction) : 0;
+      // Calculate required percentage on remaining assessments
+      const requiredPercentage = requiredFromRemaining / this.totalRemainingWeight;
+      
+      return Math.max(0, Math.round(requiredPercentage));
+    },
+    updateSimulatedMark(assessmentType, value) {
+      if (value === '' || value === null) {
+        this.$delete(this.simulatedMarks, assessmentType);
+      } else {
+        this.$set(this.simulatedMarks, assessmentType, parseFloat(value));
+      }
+      this.calculateRequiredMarks();
+    },
+    clearSimulation() {
+      this.simulatedMarks = {};
+      this.assessments.forEach(assessment => {
+        this.simulatedMarks[assessment.assessment_type] = null;
+      });
+      this.calculateRequiredMarks();
+    },
+    applyPreset(type) {
+      this.assessments.forEach(assessment => {
+        let targetMark;
+        const maxMark = parseFloat(assessment.max_mark);
+        
+        switch(type) {
+          case 'best':
+            targetMark = maxMark;
+            break;
+          case 'good':
+            targetMark = maxMark * 0.85;
+            break;
+          case 'average':
+            targetMark = maxMark * 0.70;
+            break;
+          case 'minimal':
+            targetMark = maxMark * 0.50;
+            break;
+          default:
+            targetMark = 0;
+        }
+        
+        this.simulatedMarks[assessment.assessment_type] = Math.round(targetMark);
+      });
+      
+      this.calculateRequiredMarks();
+    },
+    getCurrentMarkForAssessment(assessmentType) {
+      const assessment = this.assessments.find(a => a.assessment_type === assessmentType);
+      return assessment && assessment.mark ? parseFloat(assessment.mark) : null;
+    },
+    getMaxMarkForAssessment(assessmentType) {
+      const assessment = this.assessments.find(a => a.assessment_type === assessmentType);
+      return assessment ? parseFloat(assessment.max_mark) : 0;
+    },
+    getAssessmentWeight(assessmentType) {
+      const assessment = this.assessments.find(a => a.assessment_type === assessmentType);
+      return assessment ? parseFloat(assessment.weightage) : 0;
+    },
+    getAssessmentTypeBadgeClass(type) {
+      const types = {
+        'Assignment': 'bg-success',
+        'Quiz': 'bg-info',
+        'Test': 'bg-warning',
+        'Final Exam': 'bg-danger',
+        'Project': 'bg-primary',
+        'Lab': 'bg-secondary'
+      };
+      return types[type] || 'bg-secondary';
     },
     formatRequiredMark(value) {
       if (value <= 0) return 'Already achieved';
       if (value > 100) return 'Not possible';
       return `${value}% needed`;
     },
-    applyPreset(preset) {
-      // Apply preset values to all simulated assessments
-      let presetValue = 0;
-      
-      switch(preset) {
-        case 'best':
-          presetValue = 90;
-          break;
-        case 'good':
-          presetValue = 75;
-          break;
-        case 'average':
-          presetValue = 65;
-          break;
-        case 'minimal':
-          presetValue = 50;
-          break;
-      }
-      
-      // Apply the preset percentage to all unassessed items
-      this.courseAssessments.forEach(assessment => {
-        if (!this.hasMarkForAssessment(assessment.id)) {
-          // Calculate the actual mark value based on the percentage and max mark
-          const markValue = Math.round((presetValue / 100) * assessment.max_mark);
-          this.simulatedMarks[assessment.id] = markValue;
-        }
-      });
-      
-      this.calculateRequiredMarks();
+    formatDate(dateString) {
+      if (!dateString) return 'Not set';
+      return new Date(dateString).toLocaleDateString();
     }
   }
 }

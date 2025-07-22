@@ -177,6 +177,7 @@ require __DIR__ . '/src/routes/notifications.php';
 require __DIR__ . '/src/routes/admin.php';
 require __DIR__ . '/src/routes/system.php';
 require __DIR__ . '/src/routes/comparisons.php';
+require __DIR__ . '/src/routes/adviseeReports.php';
 
 // Catch-all route to handle 404 errors
 $app->map(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], '/{routes:.+}', function ($request, $response) {

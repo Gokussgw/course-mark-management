@@ -26,6 +26,8 @@ const AdviseeDetail = () => import('../views/advisor/AdviseeDetail.vue')
 const AtRiskStudents = () => import('../views/advisor/AtRiskStudents.vue')
 const AdvisorFeedbackView = () => import('../views/advisor/FeedbackView.vue')
 const AdvisorComparisons = () => import('../views/advisor/AdvisorComparisons.vue')
+const AdviseeReports = () => import('../views/advisor/AdviseeReports.vue')
+const AdviseeDetailReport = () => import('../views/advisor/AdviseeDetailReport.vue')
 const MarkBreakdown = () => import('../views/shared/MarkBreakdown.vue')
 const UserManagement = () => import('../views/admin/UserManagement.vue')
 const AdminEnrollmentManagement = () => import('../views/admin/EnrollmentManagement.vue')
@@ -223,6 +225,18 @@ const routes = [
     path: '/advisor/comparisons',
     name: 'AdvisorComparisons',
     component: AdvisorComparisons,
+    meta: { requiresAuth: true, role: 'advisor' }
+  },
+  {
+    path: '/advisor/advisee-reports',
+    name: 'AdviseeReports',
+    component: AdviseeReports,
+    meta: { requiresAuth: true, role: 'advisor' }
+  },
+  {
+    path: '/advisor/advisee-report/:studentId',
+    name: 'AdviseeDetailReport',
+    component: AdviseeDetailReport,
     meta: { requiresAuth: true, role: 'advisor' }
   },
   // Admin routes

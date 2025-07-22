@@ -484,4 +484,263 @@ $app->group('/api/marks', function ($group) {
             return $response->withStatus(500)->withHeader('Content-Type', 'application/json');
         }
     });
+
+    // Get student course detail - comprehensive data for a specific course using final_marks_custom
+    $group->post('/student_course_detail', function (Request $request, Response $response) {
+        $data = $request->getParsedBody();
+        $student_id = $data['student_id'] ?? null;
+        $course_id = $data['course_id'] ?? null;
+
+        if (!$student_id || !$course_id) {
+            $response->getBody()->write(json_encode(['error' => 'student_id and course_id are required']));
+            return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+        }
+
+        $pdo = $this->get('pdo');
+
+        try {
+            // Get course details and enrollment verification
+            $courseStmt = $pdo->prepare("
+                SELECT 
+                    c.id,
+                    c.code,
+                    c.name,
+                    c.semester,
+                    c.academic_year,
+                    u.name as lecturer_name,
+                    u.email as lecturer_email,
+                    e.id as enrollment_id
+                FROM courses c
+                LEFT JOIN users u ON c.lecturer_id = u.id
+                LEFT JOIN enrollments e ON e.course_id = c.id AND e.student_id = ?
+                WHERE c.id = ?
+            ");
+            $courseStmt->execute([$student_id, $course_id]);
+            $course = $courseStmt->fetch();
+
+            if (!$course) {
+                $response->getBody()->write(json_encode(['error' => 'Course not found']));
+                return $response->withStatus(404)->withHeader('Content-Type', 'application/json');
+            }
+
+            if (!$course['enrollment_id']) {
+                $response->getBody()->write(json_encode(['error' => 'Student not enrolled in this course']));
+                return $response->withStatus(403)->withHeader('Content-Type', 'application/json');
+            }
+
+            // Get marks from final_marks_custom table
+            $marksStmt = $pdo->prepare("
+                SELECT 
+                    assignment_mark,
+                    assignment_percentage,
+                    quiz_mark,
+                    quiz_percentage,
+                    test_mark,
+                    test_percentage,
+                    final_exam_mark,
+                    final_exam_percentage,
+                    component_total,
+                    final_grade,
+                    letter_grade,
+                    gpa
+                FROM final_marks_custom 
+                WHERE student_id = ? AND course_id = ?
+            ");
+            $marksStmt->execute([$student_id, $course_id]);
+            $marksData = $marksStmt->fetch();
+
+            // Create assessments array from the marks data
+            $assessments = [];
+            
+            if ($marksData) {
+                // Assignment
+                $assessments[] = [
+                    'assessment_id' => 'assignment',
+                    'assessment_name' => 'Assignment',
+                    'assessment_type' => 'assignment',
+                    'max_mark' => '100.00',
+                    'weightage' => '20.00', // Assuming standard weightages
+                    'is_final_exam' => 0,
+                    'date' => null,
+                    'mark' => number_format($marksData['assignment_mark'], 2),
+                    'mark_id' => $marksData['assignment_mark'] > 0 ? 'assignment' : null,
+                    'marked_at' => null
+                ];
+
+                // Quiz
+                $assessments[] = [
+                    'assessment_id' => 'quiz',
+                    'assessment_name' => 'Quiz',
+                    'assessment_type' => 'quiz',
+                    'max_mark' => '100.00',
+                    'weightage' => '15.00',
+                    'is_final_exam' => 0,
+                    'date' => null,
+                    'mark' => number_format($marksData['quiz_mark'], 2),
+                    'mark_id' => $marksData['quiz_mark'] > 0 ? 'quiz' : null,
+                    'marked_at' => null
+                ];
+
+                // Test (Midterm)
+                $assessments[] = [
+                    'assessment_id' => 'test',
+                    'assessment_name' => 'Midterm Test',
+                    'assessment_type' => 'midterm',
+                    'max_mark' => '100.00',
+                    'weightage' => '25.00',
+                    'is_final_exam' => 0,
+                    'date' => null,
+                    'mark' => number_format($marksData['test_mark'], 2),
+                    'mark_id' => $marksData['test_mark'] > 0 ? 'test' : null,
+                    'marked_at' => null
+                ];
+
+                // Final Exam
+                $assessments[] = [
+                    'assessment_id' => 'final_exam',
+                    'assessment_name' => 'Final Exam',
+                    'assessment_type' => 'final_exam',
+                    'max_mark' => '100.00',
+                    'weightage' => '40.00',
+                    'is_final_exam' => 1,
+                    'date' => null,
+                    'mark' => number_format($marksData['final_exam_mark'], 2),
+                    'mark_id' => $marksData['final_exam_mark'] > 0 ? 'final_exam' : null,
+                    'marked_at' => null
+                ];
+
+                // Calculate performance metrics
+                $totalMarks = 400; // 4 components * 100 each
+                $earnedMarks = $marksData['assignment_mark'] + $marksData['quiz_mark'] + 
+                              $marksData['test_mark'] + $marksData['final_exam_mark'];
+                $overallPercentage = $marksData['final_grade'];
+
+                $performance = [
+                    'overall_percentage' => round($overallPercentage, 2),
+                    'total_marks' => $totalMarks,
+                    'earned_marks' => round($earnedMarks, 2),
+                    'total_weightage' => 100,
+                    'earned_weightage' => round($overallPercentage, 2),
+                    'letter_grade' => $marksData['letter_grade'],
+                    'gpa' => $marksData['gpa']
+                ];
+            } else {
+                // No marks found - return empty assessments
+                $assessments = [
+                    [
+                        'assessment_id' => 'assignment',
+                        'assessment_name' => 'Assignment',
+                        'assessment_type' => 'assignment',
+                        'max_mark' => '100.00',
+                        'weightage' => '20.00',
+                        'is_final_exam' => 0,
+                        'date' => null,
+                        'mark' => '0.00',
+                        'mark_id' => null,
+                        'marked_at' => null
+                    ],
+                    [
+                        'assessment_id' => 'quiz',
+                        'assessment_name' => 'Quiz',
+                        'assessment_type' => 'quiz',
+                        'max_mark' => '100.00',
+                        'weightage' => '15.00',
+                        'is_final_exam' => 0,
+                        'date' => null,
+                        'mark' => '0.00',
+                        'mark_id' => null,
+                        'marked_at' => null
+                    ],
+                    [
+                        'assessment_id' => 'test',
+                        'assessment_name' => 'Midterm Test',
+                        'assessment_type' => 'midterm',
+                        'max_mark' => '100.00',
+                        'weightage' => '25.00',
+                        'is_final_exam' => 0,
+                        'date' => null,
+                        'mark' => '0.00',
+                        'mark_id' => null,
+                        'marked_at' => null
+                    ],
+                    [
+                        'assessment_id' => 'final_exam',
+                        'assessment_name' => 'Final Exam',
+                        'assessment_type' => 'final_exam',
+                        'max_mark' => '100.00',
+                        'weightage' => '40.00',
+                        'is_final_exam' => 1,
+                        'date' => null,
+                        'mark' => '0.00',
+                        'mark_id' => null,
+                        'marked_at' => null
+                    ]
+                ];
+
+                $performance = [
+                    'overall_percentage' => 0,
+                    'total_marks' => 400,
+                    'earned_marks' => 0,
+                    'total_weightage' => 100,
+                    'earned_weightage' => 0,
+                    'letter_grade' => 'N/A',
+                    'gpa' => 0
+                ];
+            }
+
+            // Get student's ranking in this course
+            $rankingStmt = $pdo->prepare("
+                SELECT 
+                    ranking.student_id,
+                    ranking.final_grade,
+                    ranking.rank_position,
+                    u.name as student_name
+                FROM (
+                    SELECT 
+                        student_id,
+                        final_grade,
+                        RANK() OVER (ORDER BY final_grade DESC) as rank_position
+                    FROM final_marks_custom
+                    WHERE course_id = ?
+                ) ranking
+                JOIN users u ON ranking.student_id = u.id
+                WHERE ranking.student_id = ?
+            ");
+            $rankingStmt->execute([$course_id, $student_id]);
+            $ranking = $rankingStmt->fetch();
+
+            // Get total students in course for ranking context
+            $totalStudentsStmt = $pdo->prepare("
+                SELECT COUNT(*) as total_students
+                FROM final_marks_custom
+                WHERE course_id = ?
+            ");
+            $totalStudentsStmt->execute([$course_id]);
+            $totalStudents = $totalStudentsStmt->fetch()['total_students'];
+
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'course' => [
+                    'id' => $course['id'],
+                    'code' => $course['code'],
+                    'name' => $course['name'],
+                    'semester' => $course['semester'],
+                    'academic_year' => $course['academic_year'],
+                    'lecturer_name' => $course['lecturer_name'],
+                    'lecturer_email' => $course['lecturer_email']
+                ],
+                'assessments' => $assessments,
+                'performance' => $performance,
+                'ranking' => [
+                    'position' => $ranking ? $ranking['rank_position'] : null,
+                    'total_students' => $totalStudents,
+                    'final_grade' => $ranking ? $ranking['final_grade'] : 0
+                ]
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (PDOException $e) {
+            $response->getBody()->write(json_encode(['error' => 'Database error: ' . $e->getMessage()]));
+            return $response->withStatus(500)->withHeader('Content-Type', 'application/json');
+        }
+    });
 });
