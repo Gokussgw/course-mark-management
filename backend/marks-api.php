@@ -131,14 +131,15 @@ function getCourseStudentsWithMarks()
                 u.id as student_id,
                 u.name as student_name,
                 u.matric_number,
+                u.email,
                 e.created_at as enrolled_at,
-                cm.assignment_mark,
-                cm.quiz_mark,
-                cm.test_mark,
-                cm.assignment_percentage,
-                cm.quiz_percentage,
-                cm.test_percentage,
-                cm.component_total,
+                fm.assignment_mark,
+                fm.quiz_mark,
+                fm.test_mark,
+                fm.assignment_percentage,
+                fm.quiz_percentage,
+                fm.test_percentage,
+                fm.component_total,
                 fm.final_exam_mark,
                 fm.final_exam_percentage,
                 fm.final_grade,
@@ -146,7 +147,6 @@ function getCourseStudentsWithMarks()
                 fm.gpa
             FROM enrollments e
             INNER JOIN users u ON e.student_id = u.id
-            LEFT JOIN component_marks cm ON e.student_id = cm.student_id AND e.course_id = cm.course_id
             LEFT JOIN final_marks_custom fm ON e.student_id = fm.student_id AND e.course_id = fm.course_id
             WHERE e.course_id = ? AND u.role = 'student'
             ORDER BY u.name
@@ -266,18 +266,6 @@ function saveStudentMarks()
         $test_mark = floatval($marks['test'] ?? 0);
         $final_exam_mark = floatval($marks['final_exam'] ?? 0);
 
-        // Save component marks
-        $stmt = $pdo->prepare("
-            INSERT INTO component_marks (student_id, course_id, assignment_mark, quiz_mark, test_mark)
-            VALUES (?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE 
-                assignment_mark = VALUES(assignment_mark),
-                quiz_mark = VALUES(quiz_mark),
-                test_mark = VALUES(test_mark),
-                updated_at = CURRENT_TIMESTAMP
-        ");
-        $stmt->execute([$student_id, $course_id, $assignment_mark, $quiz_mark, $test_mark]);
-
         // Calculate component total (70%)
         $component_total = ($assignment_mark * 0.25) + ($quiz_mark * 0.20) + ($test_mark * 0.25);
 
@@ -311,11 +299,24 @@ function saveStudentMarks()
             $gpa = 2.00;
         }
 
-        // Save final marks
+        // Save final marks with individual component marks
         $stmt = $pdo->prepare("
-            INSERT INTO final_marks_custom (student_id, course_id, final_exam_mark, final_exam_percentage, component_total, final_grade, letter_grade, gpa)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO final_marks_custom (
+                student_id, course_id, 
+                assignment_mark, assignment_percentage,
+                quiz_mark, quiz_percentage,
+                test_mark, test_percentage,
+                final_exam_mark, final_exam_percentage, 
+                component_total, final_grade, letter_grade, gpa
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE 
+                assignment_mark = VALUES(assignment_mark),
+                assignment_percentage = VALUES(assignment_percentage),
+                quiz_mark = VALUES(quiz_mark),
+                quiz_percentage = VALUES(quiz_percentage),
+                test_mark = VALUES(test_mark),
+                test_percentage = VALUES(test_percentage),
                 final_exam_mark = VALUES(final_exam_mark),
                 final_exam_percentage = VALUES(final_exam_percentage),
                 component_total = VALUES(component_total),
@@ -327,8 +328,14 @@ function saveStudentMarks()
         $stmt->execute([
             $student_id,
             $course_id,
+            $assignment_mark,
+            $assignment_mark, // assignment_percentage (raw score for now)
+            $quiz_mark,
+            $quiz_mark, // quiz_percentage (raw score for now)
+            $test_mark,
+            $test_mark, // test_percentage (raw score for now)
             $final_exam_mark,
-            $final_exam_mark * 0.30,
+            $final_exam_mark, // final_exam_percentage (raw score for now)
             $component_total,
             $final_grade,
             $letter_grade,
@@ -430,29 +437,7 @@ function calculateFinalMarksForStudent($student_id, $course_id, $lecturer_id)
         $gpa_points = 1.00;
     }
 
-    // Save final marks
-    $stmt = $pdo->prepare("
-        INSERT INTO final_marks (student_id, course_id, component_marks, final_exam_marks, final_marks, grade, gpa_points, calculated_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE 
-            component_marks = VALUES(component_marks),
-            final_exam_marks = VALUES(final_exam_marks),
-            final_marks = VALUES(final_marks),
-            grade = VALUES(grade),
-            gpa_points = VALUES(gpa_points),
-            calculated_by = VALUES(calculated_by),
-            updated_at = CURRENT_TIMESTAMP
-    ");
-    $stmt->execute([
-        $student_id,
-        $course_id,
-        round($component_marks, 2),
-        $marks['final_exam'],
-        round($final_marks, 2),
-        $grade,
-        $gpa_points,
-        $lecturer_id
-    ]);
+    // Grade and GPA are now stored in final_marks_custom table via the main INSERT
 }
 
 function handlePut()
@@ -508,12 +493,6 @@ function deleteStudentMarks()
 
         // Delete all marks for student in course
         $stmt = $pdo->prepare("
-            DELETE FROM component_marks 
-            WHERE student_id = ? AND course_id = ?
-        ");
-        $stmt->execute([$student_id, $course_id]);
-
-        $stmt = $pdo->prepare("
             DELETE FROM final_marks_custom 
             WHERE student_id = ? AND course_id = ?
         ");
@@ -557,12 +536,11 @@ function exportMarksCSV()
         $stmt = $pdo->prepare("
             SELECT 
                 u.id, u.name, u.matric_number,
-                cm.assignment_mark, cm.quiz_mark, cm.test_mark, cm.component_total,
+                fm.assignment_mark, fm.quiz_mark, fm.test_mark, fm.component_total,
                 fm.final_exam_mark, fm.final_exam_percentage, fm.final_grade, fm.letter_grade, fm.gpa,
                 fm.created_at as marks_updated
             FROM enrollments e
             JOIN users u ON e.student_id = u.id
-            LEFT JOIN component_marks cm ON e.student_id = cm.student_id AND e.course_id = cm.course_id
             LEFT JOIN final_marks_custom fm ON e.student_id = fm.student_id AND e.course_id = fm.course_id
             WHERE e.course_id = ?
             ORDER BY u.name
