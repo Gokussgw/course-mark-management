@@ -89,6 +89,18 @@ function handleGet()
         case 'recent_notifications':
             getRecentUserNotifications();
             break;
+        case 'mark_notification_read':
+            markNotificationAsRead();
+            break;
+        case 'student_dashboard_courses':
+            getStudentDashboardCourses();
+            break;
+        case 'student_dashboard_assessments':
+            getStudentDashboardAssessments();
+            break;
+        case 'student_dashboard_performance':
+            getStudentDashboardPerformance();
+            break;
         default:
             http_response_code(400);
             echo json_encode(['error' => 'Invalid action']);
@@ -353,6 +365,15 @@ function saveStudentMarks()
             $gpa = 2.00;
         }
 
+        // Check existing marks BEFORE updating for notification comparison
+        $existingStmt = $pdo->prepare("
+            SELECT assignment_mark, quiz_mark, test_mark, final_exam_mark 
+            FROM final_marks_custom 
+            WHERE student_id = ? AND course_id = ?
+        ");
+        $existingStmt->execute([$student_id, $course_id]);
+        $existing = $existingStmt->fetch();
+
         // Save final marks with individual component marks
         $stmt = $pdo->prepare("
             INSERT INTO final_marks_custom (
@@ -404,15 +425,6 @@ function saveStudentMarks()
             'test' => $test_mark,
             'final_exam' => $final_exam_mark
         ];
-
-        // Check if this is an update (get existing marks first)
-        $existingStmt = $pdo->prepare("
-            SELECT assignment_mark, quiz_mark, test_mark, final_exam_mark 
-            FROM final_marks_custom 
-            WHERE student_id = ? AND course_id = ?
-        ");
-        $existingStmt->execute([$student_id, $course_id]);
-        $existing = $existingStmt->fetch();
 
         // Send notifications for updated components
         foreach ($components as $componentType => $newMark) {
@@ -792,6 +804,220 @@ function sendCourseAnnouncement()
     } else {
         http_response_code(500);
         echo json_encode(['error' => 'Failed to send course announcement']);
+    }
+}
+
+function markNotificationAsRead()
+{
+    global $pdo, $request;
+    
+    $notification_id = $request['notification_id'] ?? null;
+    
+    if (!$notification_id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Notification ID required']);
+        return;
+    }
+    
+    try {
+        $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = ?");
+        $success = $stmt->execute([$notification_id]);
+        
+        if ($success && $stmt->rowCount() > 0) {
+            echo json_encode(['success' => true, 'message' => 'Notification marked as read']);
+        } else {
+            http_response_code(404);
+            echo json_encode(['error' => 'Notification not found']);
+        }
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+    }
+}
+
+function getStudentDashboardCourses()
+{
+    global $pdo;
+    
+    $student_id = $_GET['student_id'] ?? null;
+    
+    if (!$student_id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Student ID required']);
+        return;
+    }
+    
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 
+                c.id,
+                c.code,
+                c.name,
+                c.semester,
+                c.academic_year,
+                u.name as lecturer_name,
+                fm.final_grade as average,
+                fm.letter_grade,
+                fm.gpa,
+                CASE 
+                    WHEN fm.final_grade IS NOT NULL THEN 
+                        CASE 
+                            WHEN fm.final_grade >= 80 THEN 100
+                            WHEN fm.final_grade >= 60 THEN 85
+                            WHEN fm.final_grade >= 40 THEN 65
+                            ELSE 40
+                        END
+                    ELSE 0
+                END as progress
+            FROM enrollments e
+            JOIN courses c ON e.course_id = c.id
+            LEFT JOIN users u ON c.lecturer_id = u.id
+            LEFT JOIN final_marks_custom fm ON fm.student_id = e.student_id AND fm.course_id = c.id
+            WHERE e.student_id = ?
+            ORDER BY c.code
+        ");
+        
+        $stmt->execute([$student_id]);
+        $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Format the data
+        foreach ($courses as &$course) {
+            $course['progress'] = (int)$course['progress'];
+            $course['average'] = $course['average'] ? round($course['average'], 1) : 0;
+            
+            // Get ranking for each course
+            $rankStmt = $pdo->prepare("
+                SELECT 
+                    COUNT(*) + 1 as rank,
+                    total_students.total
+                FROM final_marks_custom fm1
+                CROSS JOIN (
+                    SELECT COUNT(DISTINCT student_id) as total
+                    FROM final_marks_custom
+                    WHERE course_id = ?
+                ) total_students
+                WHERE fm1.course_id = ? 
+                AND fm1.final_grade > (
+                    SELECT COALESCE(final_grade, 0)
+                    FROM final_marks_custom
+                    WHERE student_id = ? AND course_id = ?
+                )
+            ");
+            $rankStmt->execute([$course['id'], $course['id'], $student_id, $course['id']]);
+            $rankData = $rankStmt->fetch();
+            
+            $course['rank'] = $rankData ? $rankData['rank'] . '/' . $rankData['total'] : 'N/A';
+        }
+        
+        echo json_encode(['courses' => $courses]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+    }
+}
+
+function getStudentDashboardAssessments()
+{
+    global $pdo;
+    
+    $student_id = $_GET['student_id'] ?? null;
+    
+    if (!$student_id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Student ID required']);
+        return;
+    }
+    
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 
+                a.id,
+                a.name,
+                a.type,
+                a.date,
+                a.weightage,
+                a.course_id,
+                c.code as course_code,
+                c.name as course_name
+            FROM assessments a
+            JOIN courses c ON a.course_id = c.id
+            JOIN enrollments e ON e.course_id = c.id
+            WHERE e.student_id = ? 
+            AND a.date >= CURDATE()
+            ORDER BY a.date ASC
+            LIMIT 10
+        ");
+        
+        $stmt->execute([$student_id]);
+        $assessments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        echo json_encode(['assessments' => $assessments]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+    }
+}
+
+function getStudentDashboardPerformance()
+{
+    global $pdo;
+    
+    $student_id = $_GET['student_id'] ?? null;
+    
+    if (!$student_id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Student ID required']);
+        return;
+    }
+    
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 
+                c.code,
+                c.name as course_name,
+                fm.assignment_mark,
+                fm.quiz_mark,
+                fm.test_mark,
+                fm.final_exam_mark,
+                fm.final_grade,
+                fm.updated_at
+            FROM final_marks_custom fm
+            JOIN courses c ON fm.course_id = c.id
+            WHERE fm.student_id = ?
+            ORDER BY c.code
+        ");
+        
+        $stmt->execute([$student_id]);
+        $performance = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Format data for chart
+        $chartData = [
+            'labels' => [],
+            'datasets' => []
+        ];
+        
+        foreach ($performance as $course) {
+            $courseCode = $course['code'];
+            $chartData['labels'] = ['Assignment', 'Quiz', 'Test', 'Final Exam'];
+            
+            $chartData['datasets'][] = [
+                'label' => $courseCode,
+                'data' => [
+                    $course['assignment_mark'] ?: 0,
+                    $course['quiz_mark'] ?: 0,
+                    $course['test_mark'] ?: 0,
+                    $course['final_exam_mark'] ?: 0
+                ],
+                'borderColor' => sprintf('#%06X', mt_rand(0, 0xFFFFFF)),
+                'backgroundColor' => sprintf('#%06X', mt_rand(0, 0xFFFFFF)) . '20',
+                'tension' => 0.4
+            ];
+        }
+        
+        echo json_encode(['performance' => $chartData]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
     }
 }
 

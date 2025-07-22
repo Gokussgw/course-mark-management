@@ -254,75 +254,17 @@ export default {
       courses: [],
       assessments: [],
       performanceChart: null,
-      // Sample data for demonstration - in a real app, this would come from the API
-      coursesData: [
-        {
-          id: 1,
-          code: "CS101",
-          name: "Introduction to Programming",
-          lecturer_name: "Dr. Smith",
-          semester: "Fall 2023",
-          progress: 75,
-          average: 82,
-          rank: "3/30",
-        },
-        {
-          id: 2,
-          code: "CS202",
-          name: "Database Systems",
-          lecturer_name: "Prof. Johnson",
-          semester: "Fall 2023",
-          progress: 60,
-          average: 78,
-          rank: "5/25",
-        },
-        {
-          id: 3,
-          code: "MATH201",
-          name: "Discrete Mathematics",
-          lecturer_name: "Dr. Wilson",
-          semester: "Fall 2023",
-          progress: 90,
-          average: 85,
-          rank: "2/28",
-        },
-      ],
-      assessmentsData: [
-        {
-          id: 1,
-          name: "Midterm Exam",
-          course_id: 1,
-          type: "midterm",
-          date: "2023-10-15",
-          weightage: 30,
-        },
-        {
-          id: 2,
-          name: "Assignment 2",
-          course_id: 2,
-          type: "assignment",
-          date: "2023-10-10",
-          weightage: 15,
-        },
-        {
-          id: 3,
-          name: "Quiz 3",
-          course_id: 3,
-          type: "quiz",
-          date: "2023-10-05",
-          weightage: 10,
-        },
-      ],
+      performanceData: null,
+      isLoading: true
     };
   },
   computed: {
-    ...mapGetters(["isLoading"]),
     ...mapGetters("auth", ["getUser"]),
 
     upcomingAssessments() {
       const today = new Date();
 
-      return this.assessmentsData
+      return this.assessments
         .filter((a) => new Date(a.date) >= today)
         .sort((a, b) => new Date(a.date) - new Date(b.date))
         .slice(0, 5);
@@ -352,16 +294,41 @@ export default {
   },
   methods: {
     async loadData() {
+      this.isLoading = true;
       try {
-        // In a real app, we would fetch the student's courses and assessments from the API
-        // For now, using sample data
-        this.courses = this.coursesData;
-        this.assessments = this.assessmentsData;
+        const studentId = this.getUser.id;
+        
+        // Fetch all dashboard data in parallel
+        const [coursesResponse, assessmentsResponse, performanceResponse] = await Promise.all([
+          fetch(`http://localhost:8000/marks-api.php?action=student_dashboard_courses&student_id=${studentId}`, {
+            credentials: 'include'
+          }),
+          fetch(`http://localhost:8000/marks-api.php?action=student_dashboard_assessments&student_id=${studentId}`, {
+            credentials: 'include'
+          }),
+          fetch(`http://localhost:8000/marks-api.php?action=student_dashboard_performance&student_id=${studentId}`, {
+            credentials: 'include'
+          })
+        ]);
 
-        // Set loading to false - this will trigger the watcher to init the chart
-        this.$store.dispatch('setLoading', false);
+        // Parse responses
+        const coursesData = await coursesResponse.json();
+        const assessmentsData = await assessmentsResponse.json();
+        const performanceData = await performanceResponse.json();
+
+        // Update component data
+        this.courses = coursesData.courses || [];
+        this.assessments = assessmentsData.assessments || [];
+        this.performanceData = performanceData.performance || null;
+
       } catch (error) {
         console.error("Error loading dashboard data:", error);
+        // Fallback to empty data on error
+        this.courses = [];
+        this.assessments = [];
+        this.performanceData = null;
+      } finally {
+        this.isLoading = false;
       }
     },
 
@@ -419,67 +386,45 @@ export default {
           this.performanceChart = null;
         }
 
-        // Sample data for the chart
+        // Use real performance data if available, otherwise show empty chart
+        const chartData = this.performanceData || {
+          labels: ['Assignment', 'Quiz', 'Test', 'Final Exam'],
+          datasets: []
+        };
+
         this.performanceChart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: [
-            "Quiz 1",
-            "Assignment 1",
-            "Quiz 2",
-            "Midterm",
-            "Assignment 2",
-            "Quiz 3",
-          ],
-          datasets: [
-            {
-              label: "CS101",
-              data: [75, 82, 80, 85, 90, 88],
-              borderColor: "rgba(52, 152, 219, 1)",
-              backgroundColor: "rgba(52, 152, 219, 0.1)",
-              tension: 0.4,
+          type: "line",
+          data: chartData,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: "top",
+              },
+              tooltip: {
+                mode: "index",
+                intersect: false,
+                callbacks: {
+                  label: function(context) {
+                    return context.dataset.label + ': ' + context.parsed.y + '%';
+                  }
+                }
+              },
             },
-            {
-              label: "CS202",
-              data: [65, 70, 75, 78, 80, 82],
-              borderColor: "rgba(46, 204, 113, 1)",
-              backgroundColor: "rgba(46, 204, 113, 0.1)",
-              tension: 0.4,
-            },
-            {
-              label: "MATH201",
-              data: [80, 85, 82, 90, 88, 92],
-              borderColor: "rgba(231, 76, 60, 1)",
-              backgroundColor: "rgba(231, 76, 60, 0.1)",
-              tension: 0.4,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: "top",
-            },
-            tooltip: {
-              mode: "index",
-              intersect: false,
-            },
-          },
-          scales: {
-            y: {
-              min: 0,
-              max: 100,
-              ticks: {
-                callback: function (value) {
-                  return value + "%";
+            scales: {
+              y: {
+                min: 0,
+                max: 100,
+                ticks: {
+                  callback: function (value) {
+                    return value + "%";
+                  },
                 },
               },
             },
           },
-        },
-      });
+        });
       } catch (error) {
         console.error("Error initializing performance chart:", error);
       }

@@ -202,6 +202,9 @@ function getUnreadNotificationCount($pdo, $userId) {
 
 function getRecentNotifications($pdo, $userId, $limit = 10) {
     try {
+        // Ensure limit is a positive integer for security
+        $limit = max(1, min(100, intval($limit)));
+        
         $stmt = $pdo->prepare("
             SELECT 
                 n.*,
@@ -210,9 +213,9 @@ function getRecentNotifications($pdo, $userId, $limit = 10) {
             LEFT JOIN users sender ON n.sender_id = sender.id
             WHERE n.user_id = ?
             ORDER BY n.created_at DESC
-            LIMIT ?
+            LIMIT $limit
         ");
-        $stmt->execute([$userId, $limit]);
+        $stmt->execute([$userId]);
         return $stmt->fetchAll();
     } catch (PDOException $e) {
         error_log("Recent notifications error: " . $e->getMessage());

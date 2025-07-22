@@ -201,8 +201,12 @@ function getClassRankings($pdo, $user)
     }
 
     try {
-        $limit = $_GET['limit'] ?? 20;
-        $offset = $_GET['offset'] ?? 0;
+        $limit = intval($_GET['limit'] ?? 20);
+        $offset = intval($_GET['offset'] ?? 0);
+        
+        // Ensure positive values for security
+        $limit = max(1, min(100, $limit));  // Between 1 and 100
+        $offset = max(0, $offset);  // Non-negative
 
         $stmt = $pdo->prepare("
             WITH student_performance AS (
@@ -229,10 +233,10 @@ function getClassRankings($pdo, $user)
                 *
             FROM ranked_students 
             ORDER BY overall_rank
-            LIMIT ? OFFSET ?
+            LIMIT $limit OFFSET $offset
         ");
 
-        $stmt->execute([$limit, $offset]);
+        $stmt->execute();
         $rankings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Format the data
