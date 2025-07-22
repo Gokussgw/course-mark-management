@@ -22,6 +22,7 @@ const StudentFeedbackView = () => import('../views/student/FeedbackView.vue')
 const CourseComparison = () => import('../views/student/CourseComparison.vue')
 const AdviseeList = () => import('../views/advisor/AdviseeList.vue')
 const AdviseeDetail = () => import('../views/advisor/AdviseeDetail.vue')
+const StudentRankingPage = () => import('../views/advisor/StudentRankingPage.vue')
 const AtRiskStudents = () => import('../views/advisor/AtRiskStudents.vue')
 const AdvisorFeedbackView = () => import('../views/advisor/FeedbackView.vue')
 const AdvisorComparisons = () => import('../views/advisor/AdvisorComparisons.vue')
@@ -191,6 +192,12 @@ const routes = [
     path: '/advisor/advisee/:id',
     name: 'AdviseeDetail',
     component: AdviseeDetail,
+    meta: { requiresAuth: true, role: 'advisor' }
+  },
+  {
+    path: '/advisor/advisee/:id/ranking',
+    name: 'StudentRankingPage',
+    component: StudentRankingPage,
     meta: { requiresAuth: true, role: 'advisor' }
   },
   {

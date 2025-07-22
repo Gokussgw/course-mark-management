@@ -29,6 +29,11 @@ if ($path === '/breakdown-api.php' && file_exists(__DIR__ . '/breakdown-api.php'
     return;
 }
 
+if ($path === '/ranking-api.php' && file_exists(__DIR__ . '/ranking-api.php')) {
+    include __DIR__ . '/ranking-api.php';
+    return;
+}
+
 // Handle auth routes
 if (strpos($path, '/api/auth/') === 0) {
     $file = __DIR__ . $path . '.php';

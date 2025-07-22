@@ -120,7 +120,7 @@
               <i class="fas fa-user-graduate fa-3x text-muted mb-3"></i>
             </div>
 
-            <div v-else class="table-responsive">
+            <div v-else class="table-responsive" style="max-height: 600px; overflow-y: auto;">
               <table class="table table-hover align-middle">
                 <thead>
                   <tr>
@@ -191,8 +191,10 @@
               </div>
             </div>
 
-            <div v-else>
-              <canvas id="riskChart" width="100" height="100"></canvas>
+            <div v-else style="max-height: 500px; overflow-y: auto;">
+              <div class="chart-container" style="position: relative; height: 250px; width: 100%;">
+                <canvas id="riskChart"></canvas>
+              </div>
 
               <div class="risk-stats mt-4">
                 <div class="risk-stat-item high">
@@ -214,6 +216,89 @@
                 You have {{ highRiskCount }} student(s) at high risk who need
                 immediate attention.
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-12 mb-4">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">My Advisees Rankings</h5>
+            <p class="card-text text-muted mb-4">
+              Performance rankings of your advisees
+            </p>
+
+            <div v-if="loadingRankings" class="text-center py-4">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading rankings...</span>
+              </div>
+            </div>
+
+            <div v-else-if="adviseeRankings.length === 0" class="text-center py-4">
+              <p>No ranking data available for your advisees.</p>
+              <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+            </div>
+
+            <div v-else class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Among My Advisees</th>
+                    <th>Student</th>
+                    <th>Matric Number</th>
+                    <th>GPA</th>
+                    <th>Overall Rank</th>
+                    <th>Overall Percentile</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="student in adviseeRankings" :key="student.id">
+                    <td>
+                      <span class="rank-badge" :class="getAdvisorRankBadgeClass(student.advisor_rank)">
+                        #{{ student.advisor_rank }}
+                      </span>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <div class="avatar avatar-sm me-2">
+                          {{ getInitials(student.name) }}
+                        </div>
+                        <div>{{ student.name }}</div>
+                      </div>
+                    </td>
+                    <td>{{ student.matric_number }}</td>
+                    <td>
+                      <strong :class="getGpaClass(student.gpa)">{{ student.gpa }}%</strong>
+                    </td>
+                    <td>
+                      <span class="badge bg-info">#{{ student.overall_rank }} / {{ student.total_students }}</span>
+                    </td>
+                    <td>{{ student.overall_percentile }}th</td>
+                    <td>
+                      <div class="btn-group btn-group-sm">
+                        <router-link
+                          :to="`/advisor/advisee/${student.id}`"
+                          class="btn btn-outline-primary"
+                          title="View Details"
+                        >
+                          <i class="fas fa-eye"></i>
+                        </router-link>
+                        <button
+                          class="btn btn-outline-info"
+                          @click="showStudentRanking(student)"
+                          title="View Full Ranking"
+                        >
+                          <i class="fas fa-trophy"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -339,9 +424,11 @@ export default {
       loading: false,
       advisees: [],
       adviseesCourses: [],
+      adviseeRankings: [],
       showCourseDropdown: false,
       notes: [],
       riskChart: null,
+      loadingRankings: false,
       currentNote: {
         id: null,
         student_id: null,
@@ -454,7 +541,8 @@ export default {
         await Promise.all([
           this.loadAdvisees(),
           this.loadNotes(),
-          this.loadAdviseesCourses()
+          this.loadAdviseesCourses(),
+          this.loadAdviseeRankings()
         ]);
 
         this.$nextTick(() => {
@@ -598,6 +686,59 @@ export default {
       }
     },
 
+    async loadAdviseeRankings() {
+      try {
+        this.loadingRankings = true;
+        const token = this.$store.state.auth.token;
+        if (!token) {
+          throw new Error('No authentication token');
+        }
+
+        const response = await fetch(
+          `http://localhost:8080/ranking-api.php?action=advisor_students_rankings`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          this.adviseeRankings = data.rankings || [];
+        } else {
+          console.error("Failed to load advisee rankings");
+          this.adviseeRankings = [];
+        }
+      } catch (error) {
+        console.error("Error loading advisee rankings:", error);
+        this.adviseeRankings = [];
+      } finally {
+        this.loadingRankings = false;
+      }
+    },
+
+    getAdvisorRankBadgeClass(rank) {
+      if (rank <= 3) return 'rank-badge-gold';
+      if (rank <= 5) return 'rank-badge-silver';
+      if (rank <= 10) return 'rank-badge-bronze';
+      return 'rank-badge-default';
+    },
+
+    getGpaClass(gpa) {
+      if (gpa >= 80) return 'text-success';
+      if (gpa >= 70) return 'text-info';
+      if (gpa >= 60) return 'text-warning';
+      return 'text-danger';
+    },
+
+    showStudentRanking(student) {
+      // Navigate to student ranking page or show modal
+      this.$router.push(`/advisor/advisee/${student.id}/ranking`);
+    },
+
     getInitials(name) {
       return name
         .split(" ")
@@ -660,7 +801,7 @@ export default {
         },
         options: {
           responsive: true,
-          maintainAspectRatio: false,
+          maintainAspectRatio: true,
           plugins: {
             legend: {
               position: "bottom",
@@ -797,6 +938,11 @@ export default {
 </script>
 
 <style scoped>
+.dashboard {
+  max-height: 100vh;
+  overflow-y: auto;
+}
+
 .dashboard h1 {
   color: #2c3e50;
   font-weight: 700;
@@ -879,6 +1025,8 @@ export default {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
+  max-height: 600px;
+  overflow-y: auto;
 }
 
 .note-card {
@@ -920,5 +1068,44 @@ export default {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.chart-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.chart-container canvas {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.rank-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: white;
+}
+
+.rank-badge-gold {
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  color: #333;
+}
+
+.rank-badge-silver {
+  background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
+  color: #333;
+}
+
+.rank-badge-bronze {
+  background: linear-gradient(135deg, #cd7f32, #daa520);
+  color: white;
+}
+
+.rank-badge-default {
+  background: #6c757d;
+  color: white;
 }
 </style>

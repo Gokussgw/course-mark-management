@@ -52,7 +52,7 @@ $containerBuilder->addDefinitions([
     'jwt' => function ($c) {
         return function ($request, $handler) {
             $authHeader = $request->getHeaderLine('Authorization');
-            
+
             if (empty($authHeader)) {
                 $response = new \Slim\Psr7\Response();
                 $response->getBody()->write(json_encode(['error' => 'Authorization token required']));

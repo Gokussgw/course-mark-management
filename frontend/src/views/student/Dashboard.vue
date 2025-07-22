@@ -25,6 +25,17 @@
     </div>
 
     <div class="row">
+      <!-- My Academic Ranking -->
+      <div class="col-md-12 mb-4">
+        <student-ranking 
+          :show-individual-ranking="true"
+          :show-class-rankings="true"
+          :is-own-ranking="true"
+        />
+      </div>
+    </div>
+
+    <div class="row">
       <div class="col-md-7 mb-4">
         <div class="card h-100">
           <div class="card-body">
@@ -209,9 +220,13 @@
 <script>
 import { mapGetters } from "vuex";
 import Chart from "chart.js/auto";
+import StudentRanking from '@/components/rankings/StudentRanking.vue';
 
 export default {
   name: "StudentDashboard",
+  components: {
+    StudentRanking
+  },
   data() {
     return {
       courses: [],
