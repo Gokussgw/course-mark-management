@@ -386,15 +386,63 @@ export default {
   methods: {
     async loadCourses() {
       try {
-        const user = this.$store.getters["auth/user"];
-        if (user && user.role === "student") {
+        console.log("=== loadCourses called ===");
+        
+        // Check if user is authenticated first
+        const isAuthenticated = this.$store.getters["auth/isAuthenticated"];
+        console.log("Is authenticated:", isAuthenticated);
+        
+        if (!isAuthenticated) {
+          this.error = "Please log in to view your courses";
+          this.$router.push('/login');
+          return;
+        }
+
+        let currentUser = this.$store.getters["auth/user"];
+        console.log("Current user from store:", currentUser);
+        console.log("LocalStorage token:", localStorage.getItem('token'));
+        console.log("LocalStorage user:", localStorage.getItem('user'));
+        
+        // If store user is undefined but we have token, try to re-init from localStorage
+        if (!currentUser && localStorage.getItem('token') && localStorage.getItem('user')) {
+          console.log("Re-initializing auth from localStorage...");
+          await this.$store.dispatch('auth/checkAuth');
+          currentUser = this.$store.getters["auth/user"];
+          console.log("Refreshed user:", currentUser);
+        }
+        
+        // Final fallback: parse user directly from localStorage if store is still empty
+        if (!currentUser && localStorage.getItem('user')) {
+          try {
+            console.log("Emergency fallback: parsing user from localStorage");
+            currentUser = JSON.parse(localStorage.getItem('user'));
+            console.log("Emergency fallback user:", currentUser);
+          } catch (e) {
+            console.error("Failed to parse user from localStorage:", e);
+          }
+        }
+
+        if (currentUser && currentUser.role === "student") {
+          console.log("Making API call to get courses..."); // Debug log
           // Get courses the student is enrolled in
           const response = await axios.get("/api/enrollments/student/courses");
+          console.log("API Response:", response.data); // Debug log
           this.courses = response.data;
+          
+          if (this.courses.length === 0) {
+            this.error = "You are not enrolled in any courses yet";
+          }
+        } else {
+          this.error = `Access denied - Student role required. Current user role: ${currentUser?.role || 'undefined'}`;
         }
       } catch (error) {
         console.error("Error loading courses:", error);
-        this.error = "Failed to load courses";
+        if (error.response?.status === 401) {
+          this.error = "Authentication failed - please log in again";
+          this.$router.push('/login');
+        } else {
+          this.error = error.response?.data?.error || "Failed to load courses";
+        }
       }
     },
     async loadComparison() {

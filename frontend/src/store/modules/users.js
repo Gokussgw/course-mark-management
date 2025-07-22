@@ -245,6 +245,39 @@ export default {
       } finally {
         dispatch('setLoading', false, { root: true });
       }
+    },
+
+    // Fetch a specific advisee by ID
+    async fetchAdviseeById({ dispatch }, studentId) {
+      try {
+        dispatch('setLoading', true, { root: true });
+        
+        // Use the advisor dashboard API to get advisee data
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`http://localhost:8080/advisor-dashboard-api.php?action=advisees`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        // Find the specific student in the advisees list
+        const advisee = response.data.advisees.find(student => student.id == studentId);
+        if (!advisee) {
+          throw new Error('Student not found or not under your advisory');
+        }
+        
+        // Add default properties if missing
+        advisee.advisorNotes = advisee.advisorNotes || [];
+        advisee.totalCreditsRequired = advisee.totalCreditsRequired || 120;
+        
+        return advisee;
+      } catch (error) {
+        const errorMsg = error.response?.data?.error || 'Failed to fetch advisee data';
+        dispatch('setError', errorMsg, { root: true });
+        throw new Error(errorMsg);
+      } finally {
+        dispatch('setLoading', false, { root: true });
+      }
     }
   }
 };

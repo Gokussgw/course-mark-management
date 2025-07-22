@@ -60,6 +60,46 @@
       </div>
     </div>
 
+    <!-- Overview Statistics -->
+    <div class="row mb-4">
+      <div class="col-md-3 mb-3">
+        <div class="card text-center bg-primary text-white">
+          <div class="card-body">
+            <i class="fas fa-user-graduate fa-2x mb-2"></i>
+            <h4 class="card-title">{{ advisees.length }}</h4>
+            <p class="card-text">Total Advisees</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card text-center bg-success text-white">
+          <div class="card-body">
+            <i class="fas fa-chart-line fa-2x mb-2"></i>
+            <h4 class="card-title">{{ lowRiskCount }}</h4>
+            <p class="card-text">Low Risk</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card text-center bg-warning text-white">
+          <div class="card-body">
+            <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+            <h4 class="card-title">{{ mediumRiskCount }}</h4>
+            <p class="card-text">Medium Risk</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card text-center bg-danger text-white">
+          <div class="card-body">
+            <i class="fas fa-skull-crossbones fa-2x mb-2"></i>
+            <h4 class="card-title">{{ highRiskCount }}</h4>
+            <p class="card-text">High Risk</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="row">
       <div class="col-md-8 mb-4">
         <div class="card h-100">
@@ -69,7 +109,7 @@
               Students under your supervision
             </p>
 
-            <div v-if="isLoading" class="text-center py-4">
+            <div v-if="loading" class="text-center py-4">
               <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
               </div>
@@ -145,7 +185,7 @@
               Overview of students at academic risk
             </p>
 
-            <div v-if="isLoading" class="text-center py-4">
+            <div v-if="loading" class="text-center py-4">
               <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
               </div>
@@ -189,7 +229,7 @@
               Your latest meeting notes and observations
             </p>
 
-            <div v-if="isLoading" class="text-center py-4">
+            <div v-if="loading" class="text-center py-4">
               <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
               </div>
@@ -296,6 +336,7 @@ export default {
   name: "AdvisorDashboard",
   data() {
     return {
+      loading: false,
       advisees: [],
       adviseesCourses: [],
       showCourseDropdown: false,
@@ -375,7 +416,6 @@ export default {
     };
   },
   computed: {
-    ...mapGetters(["isLoading"]),
     ...mapGetters("auth", ["getUser"]),
 
     userInfo() {
@@ -408,20 +448,101 @@ export default {
     },
 
     async loadData() {
+      this.loading = true;
       try {
-        // In a real app, we would fetch the advisor's advisees and notes from the API
-        // For now, using sample data
-        this.advisees = this.adviseesData;
-        this.notes = this.notesData;
-
-        // Load advisor courses (courses where advisees are enrolled)
-        await this.loadAdviseesCourses();
+        // Load real data from the API
+        await Promise.all([
+          this.loadAdvisees(),
+          this.loadNotes(),
+          this.loadAdviseesCourses()
+        ]);
 
         this.$nextTick(() => {
-          this.initRiskChart();
+          // Add a small delay to ensure DOM is fully rendered
+          setTimeout(() => {
+            this.initRiskChart();
+          }, 100);
         });
       } catch (error) {
         console.error("Error loading dashboard data:", error);
+        // Fallback to sample data if API fails
+        this.advisees = this.adviseesData;
+        this.notes = this.notesData;
+        
+        this.$nextTick(() => {
+          // Add a small delay to ensure DOM is fully rendered
+          setTimeout(() => {
+            this.initRiskChart();
+          }, 100);
+        });
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async loadAdvisees() {
+      try {
+        const token = this.$store.state.auth.token;
+        if (!token) {
+          throw new Error('No authentication token');
+        }
+
+        const response = await fetch(
+          `http://localhost:8080/advisor-dashboard-api.php?action=advisees`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          this.advisees = data.advisees || [];
+        } else {
+          console.error("Failed to load advisees");
+          // Use fallback data
+          this.advisees = this.adviseesData;
+        }
+      } catch (error) {
+        console.error("Error loading advisees:", error);
+        // Use fallback data
+        this.advisees = this.adviseesData;
+      }
+    },
+
+    async loadNotes() {
+      try {
+        const token = this.$store.state.auth.token;
+        if (!token) {
+          throw new Error('No authentication token');
+        }
+
+        const response = await fetch(
+          `http://localhost:8080/advisor-dashboard-api.php?action=notes`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          this.notes = data.notes || [];
+        } else {
+          console.error("Failed to load notes");
+          // Use fallback data
+          this.notes = this.notesData;
+        }
+      } catch (error) {
+        console.error("Error loading notes:", error);
+        // Use fallback data
+        this.notes = this.notesData;
       }
     },
 
@@ -512,6 +633,11 @@ export default {
     initRiskChart() {
       const ctx = document.getElementById("riskChart");
 
+      if (!ctx) {
+        console.warn('Risk chart canvas element not found');
+        return;
+      }
+
       if (this.riskChart) {
         this.riskChart.destroy();
       }
@@ -565,61 +691,97 @@ export default {
 
     async saveNote() {
       try {
-        // In a real app, we would save the note to the API
-        if (this.currentNote.id) {
-          // Update existing note
-          const index = this.notes.findIndex(
-            (n) => n.id === this.currentNote.id
-          );
-          if (index !== -1) {
-            this.notes[index] = { ...this.currentNote };
-          }
-        } else {
-          // Add new note
-          const student = this.advisees.find(
-            (s) => s.id === this.currentNote.student_id
-          );
-          const newNote = {
-            id: Date.now(), // temporary ID
-            student_id: this.currentNote.student_id,
-            student_name: student.name,
-            note: this.currentNote.note,
-            created_at: new Date().toISOString(),
-          };
-
-          this.notes.unshift(newNote);
+        const token = this.$store.state.auth.token;
+        if (!token) {
+          throw new Error('No authentication token');
         }
 
-        // Close the modal
-        const modalElement = document.getElementById("noteModal");
-        const modal = bootstrap.Modal.getInstance(modalElement);
-        modal.hide();
+        const response = await fetch(
+          `http://localhost:8080/advisor-dashboard-api.php?action=notes`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify(this.currentNote)
+          }
+        );
 
-        // Show success message
-        this.$store.dispatch("showToast", {
-          message: `Note ${
-            this.currentNote.id ? "updated" : "added"
-          } successfully`,
-          type: "success",
-        });
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (this.currentNote.id) {
+            // Update existing note
+            const index = this.notes.findIndex(n => n.id === this.currentNote.id);
+            if (index !== -1) {
+              this.notes[index] = data.note;
+            }
+          } else {
+            // Add new note
+            this.notes.unshift(data.note);
+          }
+
+          // Close the modal
+          const modalElement = document.getElementById("noteModal");
+          const modal = bootstrap.Modal.getInstance(modalElement);
+          modal.hide();
+
+          // Show success message
+          this.$store.dispatch("showToast", {
+            message: `Note ${this.currentNote.id ? "updated" : "added"} successfully`,
+            type: "success",
+          });
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to save note');
+        }
       } catch (error) {
         console.error("Error saving note:", error);
+        this.$store.dispatch("showToast", {
+          message: "Failed to save note: " + error.message,
+          type: "error",
+        });
       }
     },
 
     async deleteNote(note) {
       if (confirm("Are you sure you want to delete this note?")) {
         try {
-          // In a real app, we would delete the note via the API
-          this.notes = this.notes.filter((n) => n.id !== note.id);
+          const token = this.$store.state.auth.token;
+          if (!token) {
+            throw new Error('No authentication token');
+          }
 
-          // Show success message
-          this.$store.dispatch("showToast", {
-            message: "Note deleted successfully",
-            type: "success",
-          });
+          const response = await fetch(
+            `http://localhost:8080/advisor-dashboard-api.php?action=notes&note_id=${note.id}`,
+            {
+              method: "DELETE",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              }
+            }
+          );
+
+          if (response.ok) {
+            this.notes = this.notes.filter((n) => n.id !== note.id);
+
+            // Show success message
+            this.$store.dispatch("showToast", {
+              message: "Note deleted successfully",
+              type: "success",
+            });
+          } else {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to delete note');
+          }
         } catch (error) {
           console.error("Error deleting note:", error);
+          this.$store.dispatch("showToast", {
+            message: "Failed to delete note: " + error.message,
+            type: "error",
+          });
         }
       }
     },

@@ -291,6 +291,18 @@ export default {
         .slice(0, 5);
     },
   },
+  watch: {
+    isLoading(newVal, oldVal) {
+      // When loading changes from true to false, initialize chart
+      if (oldVal && !newVal) {
+        this.$nextTick(() => {
+          setTimeout(() => {
+            this.initChart();
+          }, 300);
+        });
+      }
+    }
+  },
   mounted() {
     this.loadData();
   },
@@ -302,9 +314,8 @@ export default {
         this.courses = this.coursesData;
         this.assessments = this.assessmentsData;
 
-        this.$nextTick(() => {
-          this.initChart();
-        });
+        // Set loading to false - this will trigger the watcher to init the chart
+        this.$store.dispatch('setLoading', false);
       } catch (error) {
         console.error("Error loading dashboard data:", error);
       }
@@ -350,13 +361,20 @@ export default {
 
     initChart() {
       const ctx = document.getElementById("performanceChart");
+      
+      // Check if canvas element exists
+      if (!ctx) {
+        console.warn("Performance chart canvas not found, skipping chart initialization");
+        return;
+      }
 
       if (this.performanceChart) {
         this.performanceChart.destroy();
       }
 
-      // Sample data for the chart
-      this.performanceChart = new Chart(ctx, {
+      try {
+        // Sample data for the chart
+        this.performanceChart = new Chart(ctx, {
         type: "line",
         data: {
           labels: [
@@ -416,6 +434,9 @@ export default {
           },
         },
       });
+      } catch (error) {
+        console.error("Error initializing performance chart:", error);
+      }
     },
 
     logout() {

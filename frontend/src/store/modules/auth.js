@@ -29,21 +29,30 @@ export default {
       try {
         dispatch('setLoading', true, { root: true });
         
-        // Real API call to backend using database
-        const response = await axios.post('http://localhost:8080/db-api.php', {
+        // Use the proper auth endpoint
+        const response = await axios.post('/api/auth/login', {
           email: credentials.email,
           password: credentials.password
         });
         
+        console.log('Login response:', response.data); // Debug log
         const { token, user } = response.data;
+        
+        console.log('Extracted token:', token); // Debug log
+        console.log('Extracted user:', user); // Debug log
         
         // Save to localStorage
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
         
+        console.log('Saved to localStorage - token:', localStorage.getItem('token')); // Debug log
+        console.log('Saved to localStorage - user:', localStorage.getItem('user')); // Debug log
+        
         // Update state
         commit('SET_TOKEN', token);
         commit('SET_USER', user);
+        
+        console.log('Store updated successfully'); // Debug log
         
         return user;
       } catch (error) {
@@ -80,6 +89,7 @@ export default {
     
     checkAuth({ commit }) {
       try {
+        console.log('=== checkAuth called ==='); // Debug log
         const token = localStorage.getItem('token');
         const userStr = localStorage.getItem('user');
         
@@ -91,6 +101,7 @@ export default {
           console.log('Parsed user:', user);
           commit('SET_TOKEN', token);
           commit('SET_USER', user);
+          console.log('Auth state restored from localStorage'); // Debug log
         } else {
           console.log('No auth data found in localStorage');
         }

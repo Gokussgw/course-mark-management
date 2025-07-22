@@ -93,6 +93,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'token' => createJWTToken($userData),
             'user' => $userData
         ]);
+    } elseif ($email === 'advisor1@example.com' && $password === 'password') {
+        $userData = [
+            'id' => 3,
+            'name' => 'Advisor One',
+            'email' => 'advisor1@example.com',
+            'role' => 'advisor'
+        ];
+        echo json_encode([
+            'token' => createJWTToken($userData),
+            'user' => $userData
+        ]);
     } else {
         http_response_code(401);
         echo json_encode(['error' => 'Invalid email or password']);

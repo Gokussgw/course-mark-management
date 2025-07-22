@@ -48,11 +48,43 @@ $containerBuilder->addDefinitions([
 
         return new PDO($dsn, $username, $password, $options);
     },
-    // Middleware factories - simplified for now
+    // JWT middleware with proper authentication
     'jwt' => function ($c) {
-        // Simple no-auth middleware for now
         return function ($request, $handler) {
-            return $handler->handle($request);
+            $authHeader = $request->getHeaderLine('Authorization');
+            
+            if (empty($authHeader)) {
+                $response = new \Slim\Psr7\Response();
+                $response->getBody()->write(json_encode(['error' => 'Authorization token required']));
+                return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+            }
+
+            if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+                $token = $matches[1];
+
+                try {
+                    $jwtSecret = $_ENV['JWT_SECRET'] ?? 'your_jwt_secret_key_here';
+                    $decoded = \Firebase\JWT\JWT::decode($token, new \Firebase\JWT\Key($jwtSecret, 'HS256'));
+
+                    // Add user info to request attributes
+                    $request = $request->withAttribute('user', $decoded);
+
+                    // Continue with the request
+                    return $handler->handle($request);
+                } catch (\Firebase\JWT\ExpiredException $e) {
+                    $response = new \Slim\Psr7\Response();
+                    $response->getBody()->write(json_encode(['error' => 'Token expired']));
+                    return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+                } catch (\Exception $e) {
+                    $response = new \Slim\Psr7\Response();
+                    $response->getBody()->write(json_encode(['error' => 'Invalid token']));
+                    return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+                }
+            }
+
+            $response = new \Slim\Psr7\Response();
+            $response->getBody()->write(json_encode(['error' => 'Invalid authorization header format']));
+            return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
         };
     },
     'lecturerOnly' => function ($c) {

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Auth Debug Test</title>
+  </head>
+  <body>
+    <h1>Authentication Debug Test</h1>
+    <button onclick="testLogin()">Test Login</button>
+    <button onclick="testCourses()">Test Courses (after login)</button>
+    <div id="output"></div>
+
+    <script>
+      let token = null;
+
+      async function testLogin() {
+        try {
+          const response = await fetch("http://localhost:8080/api/auth/login", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email: "student1@example.com",
+              password: "password",
+            }),
+          });
+
+          const data = await response.json();
+          document.getElementById("output").innerHTML = `
+                    <h3>Login Response:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+
+          if (data.token) {
+            token = data.token;
+            console.log("Token saved:", token);
+          }
+        } catch (error) {
+          document.getElementById(
+            "output"
+          ).innerHTML = `<h3>Login Error:</h3><pre>${error.message}</pre>`;
+        }
+      }
+
+      async function testCourses() {
+        if (!token) {
+          document.getElementById("output").innerHTML =
+            "<h3>Error: No token available. Login first.</h3>";
+          return;
+        }
+
+        try {
+          const response = await fetch(
+            "http://localhost:8080/api/enrollments/student/courses",
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          const data = await response.json();
+          document.getElementById("output").innerHTML = `
+                    <h3>Courses Response:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+        } catch (error) {
+          document.getElementById(
+            "output"
+          ).innerHTML = `<h3>Courses Error:</h3><pre>${error.message}</pre>`;
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -238,6 +238,7 @@
 
 <script>
 import { mapActions } from 'vuex'
+import Chart from 'chart.js/auto'
 
 export default {
   name: 'AdviseeDetail',
@@ -279,20 +280,20 @@ export default {
         this.loading = true;
         this.student = await this.fetchAdviseeById(this.studentId);
         
-        // Initialize the student object with sample data if it doesn't have all properties
-        // This is just for demonstration purposes until the API is fully implemented
+        // Initialize the student object with default values if properties don't exist
         if (!this.student.advisorNotes) this.student.advisorNotes = [];
         if (!this.student.status) {
-          this.student.status = this.student.gpa >= 3.0 ? 'Good Standing' : 
-                               (this.student.gpa >= 2.0 ? 'Academic Warning' : 'Academic Probation');
+          this.student.status = this.student.gpa >= 70 ? 'Good Standing' : 
+                               (this.student.gpa >= 50 ? 'Warning' : 'Probation');
         }
         if (!this.student.totalCreditsRequired) this.student.totalCreditsRequired = 120;
+        if (!this.student.currentCredits) this.student.currentCredits = this.student.enrolled_courses * 3 || 0;
         
         this.$nextTick(() => {
           this.initGpaChart();
         });
       } catch (err) {
-        this.error = 'Failed to load student data. Please try again.';
+        this.error = 'Error loading student data: ' + (err.message || err);
         console.error('Error loading student data:', err);
       } finally {
         this.loading = false;
