@@ -14,7 +14,7 @@ $app->group('/api/courses', function ($group) {
 
         try {
             // If user is a lecturer, only show their courses
-            if ($user->role === 'lecturer') {
+            if ($user && $user->role === 'lecturer') {
                 $lecturerId = $user->id;
             }
 
@@ -93,9 +93,9 @@ $app->group('/api/courses', function ($group) {
 
         // For lecturers, automatically set them as the lecturer_id
         // For admins, allow setting any lecturer_id
-        if ($user->role === 'lecturer') {
+        if ($user && $user->role === 'lecturer') {
             $lecturerId = $user->id;
-        } elseif ($user->role === 'admin') {
+        } elseif ($user && $user->role === 'admin') {
             $lecturerId = $data['lecturer_id'] ?? null;
         } else {
             $response->getBody()->write(json_encode(['error' => 'Unauthorized to create courses']));
@@ -158,7 +158,7 @@ $app->group('/api/courses', function ($group) {
             }
 
             // Check permissions: lecturers can only update their own courses
-            if ($user->role === 'lecturer' && $course['lecturer_id'] != $user->id) {
+            if ($user && $user->role === 'lecturer' && $course['lecturer_id'] != $user->id) {
                 $response->getBody()->write(json_encode(['error' => 'Unauthorized to update this course']));
                 return $response->withStatus(403)->withHeader('Content-Type', 'application/json');
             }
@@ -186,7 +186,7 @@ $app->group('/api/courses', function ($group) {
             }
 
             // Only admins can change lecturer assignment
-            if (array_key_exists('lecturer_id', $data) && $user->role === 'admin') {
+            if (array_key_exists('lecturer_id', $data) && $user && $user->role === 'admin') {
                 $updateFields[] = 'lecturer_id = :lecturer_id';
                 $params['lecturer_id'] = $data['lecturer_id'];
             }
@@ -241,7 +241,7 @@ $app->group('/api/courses', function ($group) {
             }
 
             // Check permissions: lecturers can only delete their own courses
-            if ($user->role === 'lecturer' && $course['lecturer_id'] != $user->id) {
+            if ($user && $user->role === 'lecturer' && $course['lecturer_id'] != $user->id) {
                 $response->getBody()->write(json_encode(['error' => 'Unauthorized to delete this course']));
                 return $response->withStatus(403)->withHeader('Content-Type', 'application/json');
             }

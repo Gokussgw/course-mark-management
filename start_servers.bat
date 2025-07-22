@@ -4,7 +4,7 @@ echo.
 
 echo 1. Starting Backend Server (PHP)...
 cd backend
-start "Backend Server" cmd /k "php -S localhost:8080 -t . index.php"
+start "Backend Server" cmd /k "php -S localhost:8080 router.php"
 cd ..
 
 echo 2. Waiting for backend to start...
