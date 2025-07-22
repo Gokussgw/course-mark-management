@@ -261,13 +261,6 @@
                                       .total_students
                                   }}
                                 </p>
-                                <p class="mb-0">
-                                  <strong>Percentile:</strong>
-                                  {{
-                                    detailedComparison.student_performance
-                                      .percentile
-                                  }}th
-                                </p>
                               </div>
                             </div>
                           </div>

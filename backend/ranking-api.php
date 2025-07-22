@@ -143,8 +143,7 @@ function getStudentRanking($pdo, $user)
                 FROM student_performance
             )
             SELECT 
-                *,
-                ROUND((overall_rank / total_students) * 100, 1) as percentile
+                *
             FROM ranked_students 
             WHERE id = ?
         ");
@@ -248,8 +247,7 @@ function getClassRankings($pdo, $user)
                 FROM student_performance
             )
             SELECT 
-                *,
-                ROUND((overall_rank / total_students) * 100, 1) as percentile
+                *
             FROM ranked_students 
             ORDER BY overall_rank
             LIMIT ? OFFSET ?
@@ -323,8 +321,7 @@ function getCourseRankings($pdo, $user)
                 FROM course_performance
             )
             SELECT 
-                *,
-                ROUND((course_rank / total_students_in_course) * 100, 1) as percentile
+                *
             FROM ranked_course_students 
             ORDER BY course_rank
         ");
@@ -414,10 +411,8 @@ function getAdvisorStudentsRankings($pdo, $user)
             )
             SELECT 
                 ras.*,
-                ROUND((ras.advisor_rank / ras.total_advisor_students) * 100, 1) as advisor_percentile,
                 or_table.overall_rank,
-                or_table.total_students,
-                ROUND((or_table.overall_rank / or_table.total_students) * 100, 1) as overall_percentile
+                or_table.total_students
             FROM ranked_advisor_students ras
             LEFT JOIN overall_rankings or_table ON ras.id = or_table.id
             ORDER BY ras.advisor_rank

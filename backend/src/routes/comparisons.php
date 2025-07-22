@@ -177,8 +177,7 @@ $app->group('/api/comparisons', function ($group) {
                 'student_performance' => [
                     'total_score' => round($studentTotal, 2),
                     'rank' => $studentRank,
-                    'total_students' => $totalStudents,
-                    'percentile' => $studentRank ? round((($totalStudents - $studentRank + 1) / $totalStudents) * 100, 1) : null
+                    'total_students' => $totalStudents
                 ],
                 'class_performance' => [
                     'average_score' => round($classTotal, 2),

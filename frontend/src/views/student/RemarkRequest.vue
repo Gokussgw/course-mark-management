@@ -49,13 +49,6 @@
                 </div>
               </div>
               
-              <div class="mb-3 row">
-                <label class="col-sm-4 col-form-label fw-bold">Your Percentile:</label>
-                <div class="col-sm-8">
-                  <p class="form-control-plaintext">{{ percentile }}th</p>
-                </div>
-              </div>
-              
               <div class="mb-4 row">
                 <label class="col-sm-4 col-form-label fw-bold">Lecturer:</label>
                 <div class="col-sm-8">
@@ -183,7 +176,6 @@ export default {
       assessmentInfo: {},
       courseInfo: {},
       classAverage: 0,
-      percentile: 0,
       lecturerName: '',
       remarkRequest: {
         justification: ''
@@ -232,7 +224,6 @@ export default {
         };
         
         this.classAverage = 72.5;
-        this.percentile = 45; // 45th percentile
         this.lecturerName = 'Lecturer One';
         
       } catch (error) {

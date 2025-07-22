@@ -251,7 +251,6 @@
                     <th>Matric Number</th>
                     <th>GPA</th>
                     <th>Overall Rank</th>
-                    <th>Overall Percentile</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -277,7 +276,6 @@
                     <td>
                       <span class="badge bg-info">#{{ student.overall_rank }} / {{ student.total_students }}</span>
                     </td>
-                    <td>{{ student.overall_percentile }}th</td>
                     <td>
                       <div class="btn-group btn-group-sm">
                         <router-link

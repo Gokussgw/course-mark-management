@@ -85,14 +85,6 @@
                             <small class="text-muted">Class Ranking</small>
                           </div>
                         </div>
-                        <div class="mt-2">
-                          <small class="text-muted">
-                            You're in the
-                            {{
-                              comparisonData.student_performance.percentile
-                            }}th percentile
-                          </small>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -368,13 +360,15 @@ export default {
         }
       });
 
-      // Overall performance insights
-      const studentPercentile =
-        this.comparisonData.student_performance.percentile;
-      if (studentPercentile > 75) {
-        strengths.push("Consistently high performer in class");
-      } else if (studentPercentile < 25) {
-        improvements.push("Overall performance below class median");
+      // Overall performance insights based on rank
+      const studentRank = this.comparisonData.student_performance.rank;
+      const totalStudents = this.comparisonData.student_performance.total_students;
+      if (studentRank && totalStudents) {
+        if (studentRank <= Math.ceil(totalStudents * 0.25)) {
+          strengths.push("Consistently high performer in class");
+        } else if (studentRank > Math.ceil(totalStudents * 0.75)) {
+          improvements.push("Overall performance below class median");
+        }
       }
 
       return { strengths, improvements };

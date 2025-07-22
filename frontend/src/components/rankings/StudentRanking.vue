@@ -20,7 +20,6 @@
               <div class="ranking-number">{{ individualRanking.overall_rank }}</div>
               <div class="ranking-label">Overall Rank</div>
               <div class="ranking-detail">out of {{ individualRanking.total_students }} students</div>
-              <div class="percentile">{{ individualRanking.percentile }}th percentile</div>
             </div>
           </div>
           <div class="col-md-4">
@@ -97,7 +96,6 @@
                 <th>GPA</th>
                 <th>Courses</th>
                 <th>Assessments</th>
-                <th>Percentile</th>
               </tr>
             </thead>
             <tbody>
@@ -125,7 +123,6 @@
                 </td>
                 <td>{{ student.courses_taken }}</td>
                 <td>{{ student.assessments_completed }}</td>
-                <td>{{ student.percentile }}th</td>
               </tr>
             </tbody>
           </table>
@@ -372,15 +369,6 @@ export default {
 .ranking-detail {
   font-size: 0.9rem;
   opacity: 0.9;
-}
-
-.percentile {
-  font-size: 0.8rem;
-  margin-top: 8px;
-  padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  display: inline-block;
 }
 
 .rank-badge {
