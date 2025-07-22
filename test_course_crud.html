@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Course CRUD API</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 50px auto;
+        padding: 20px;
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+        margin-bottom: 10px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      button.danger {
+        background-color: #dc3545;
+      }
+      button.danger:hover {
+        background-color: #c82333;
+      }
+      .result {
+        margin-top: 15px;
+        padding: 15px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .success {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+      }
+      .courses-list {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 15px;
+        border-radius: 4px;
+        margin-top: 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Course CRUD API Testing</h1>
+
+    <!-- Authentication Section -->
+    <div class="test-section">
+      <h3>1. Authentication</h3>
+      <p>First, login to get a JWT token:</p>
+      <div class="form-group">
+        <label>Email:</label>
+        <input type="email" id="loginEmail" value="lecturer1@example.com" />
+      </div>
+      <div class="form-group">
+        <label>Password:</label>
+        <input type="password" id="loginPassword" value="password" />
+      </div>
+      <button onclick="login()">Login</button>
+      <div id="loginResult" class="result" style="display: none"></div>
+    </div>
+
+    <!-- Get Courses Section -->
+    <div class="test-section">
+      <h3>2. Get Courses</h3>
+      <p>Fetch all courses for the logged-in lecturer:</p>
+      <button onclick="getCourses()">Get My Courses</button>
+      <div id="coursesResult" class="result" style="display: none"></div>
+      <div id="coursesList" class="courses-list" style="display: none">
+        <h4>Available Courses:</h4>
+        <div id="coursesDisplay"></div>
+      </div>
+    </div>
+
+    <!-- Create Course Section -->
+    <div class="test-section">
+      <h3>3. Create Course</h3>
+      <div class="form-group">
+        <label>Course Code:</label>
+        <input type="text" id="createCode" placeholder="e.g., CS102" />
+      </div>
+      <div class="form-group">
+        <label>Course Name:</label>
+        <input
+          type="text"
+          id="createName"
+          placeholder="e.g., Advanced Programming"
+        />
+      </div>
+      <div class="form-group">
+        <label>Semester:</label>
+        <select id="createSemester">
+          <option value="">Select Semester</option>
+          <option value="Fall">Fall</option>
+          <option value="Spring">Spring</option>
+          <option value="Summer">Summer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Academic Year:</label>
+        <input type="text" id="createYear" placeholder="e.g., 2025-2026" />
+      </div>
+      <button onclick="createCourse()">Create Course</button>
+      <div id="createResult" class="result" style="display: none"></div>
+    </div>
+
+    <!-- Update Course Section -->
+    <div class="test-section">
+      <h3>4. Update Course</h3>
+      <div class="form-group">
+        <label>Course ID to Update:</label>
+        <input type="number" id="updateId" placeholder="Enter course ID" />
+      </div>
+      <div class="form-group">
+        <label>New Course Code:</label>
+        <input type="text" id="updateCode" placeholder="New course code" />
+      </div>
+      <div class="form-group">
+        <label>New Course Name:</label>
+        <input type="text" id="updateName" placeholder="New course name" />
+      </div>
+      <div class="form-group">
+        <label>New Semester:</label>
+        <select id="updateSemester">
+          <option value="">Select Semester</option>
+          <option value="Fall">Fall</option>
+          <option value="Spring">Spring</option>
+          <option value="Summer">Summer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>New Academic Year:</label>
+        <input type="text" id="updateYear" placeholder="New academic year" />
+      </div>
+      <button onclick="updateCourse()">Update Course</button>
+      <div id="updateResult" class="result" style="display: none"></div>
+    </div>
+
+    <!-- Delete Course Section -->
+    <div class="test-section">
+      <h3>5. Delete Course</h3>
+      <div class="form-group">
+        <label>Course ID to Delete:</label>
+        <input type="number" id="deleteId" placeholder="Enter course ID" />
+      </div>
+      <button class="danger" onclick="deleteCourse()">Delete Course</button>
+      <div id="deleteResult" class="result" style="display: none"></div>
+    </div>
+
+    <script>
+      let authToken = "";
+      const apiUrl = "http://localhost:8080";
+
+      async function login() {
+        const email = document.getElementById("loginEmail").value;
+        const password = document.getElementById("loginPassword").value;
+        const resultDiv = document.getElementById("loginResult");
+
+        try {
+          const response = await fetch(`${apiUrl}/api/auth/login`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ email, password }),
+          });
+
+          const data = await response.json();
+          resultDiv.style.display = "block";
+
+          if (response.ok) {
+            authToken = data.token;
+            resultDiv.className = "result success";
+            resultDiv.textContent = `Login successful!\nUser: ${
+              data.user.name
+            }\nRole: ${data.user.role}\nToken: ${authToken.substring(
+              0,
+              50
+            )}...`;
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent = `Login failed: ${data.error}`;
+          }
+        } catch (error) {
+          resultDiv.style.display = "block";
+          resultDiv.className = "result error";
+          resultDiv.textContent = `Network error: ${error.message}`;
+        }
+      }
+
+      async function getCourses() {
+        if (!authToken) {
+          alert("Please login first");
+          return;
+        }
+
+        const resultDiv = document.getElementById("coursesResult");
+        const listDiv = document.getElementById("coursesList");
+        const displayDiv = document.getElementById("coursesDisplay");
+
+        try {
+          const response = await fetch(`${apiUrl}/api/courses`, {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+
+          const data = await response.json();
+          resultDiv.style.display = "block";
+
+          if (response.ok) {
+            resultDiv.className = "result success";
+            resultDiv.textContent = `Courses fetched successfully:\n${JSON.stringify(
+              data,
+              null,
+              2
+            )}`;
+
+            // Display courses in a readable format
+            listDiv.style.display = "block";
+            displayDiv.innerHTML = data
+              .map(
+                (course) =>
+                  `<div style="margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                            <strong>ID: ${course.id}</strong> - ${
+                    course.code
+                  }: ${course.name}<br>
+                            <small>Semester: ${
+                              course.semester || "Not specified"
+                            } | Year: ${
+                    course.academic_year || "Not specified"
+                  }</small>
+                        </div>`
+              )
+              .join("");
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent = `Error: ${data.error}`;
+            listDiv.style.display = "none";
+          }
+        } catch (error) {
+          resultDiv.style.display = "block";
+          resultDiv.className = "result error";
+          resultDiv.textContent = `Network error: ${error.message}`;
+          listDiv.style.display = "none";
+        }
+      }
+
+      async function createCourse() {
+        if (!authToken) {
+          alert("Please login first");
+          return;
+        }
+
+        const courseData = {
+          code: document.getElementById("createCode").value,
+          name: document.getElementById("createName").value,
+          semester: document.getElementById("createSemester").value,
+          academic_year: document.getElementById("createYear").value,
+        };
+
+        if (!courseData.code || !courseData.name) {
+          alert("Course code and name are required");
+          return;
+        }
+
+        const resultDiv = document.getElementById("createResult");
+
+        try {
+          const response = await fetch(`${apiUrl}/api/courses`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify(courseData),
+          });
+
+          const data = await response.json();
+          resultDiv.style.display = "block";
+
+          if (response.ok) {
+            resultDiv.className = "result success";
+            resultDiv.textContent = `Course created successfully!\nCourse ID: ${
+              data.courseId
+            }\nResponse: ${JSON.stringify(data, null, 2)}`;
+
+            // Clear the form
+            document.getElementById("createCode").value = "";
+            document.getElementById("createName").value = "";
+            document.getElementById("createSemester").value = "";
+            document.getElementById("createYear").value = "";
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent = `Error: ${data.error}`;
+          }
+        } catch (error) {
+          resultDiv.style.display = "block";
+          resultDiv.className = "result error";
+          resultDiv.textContent = `Network error: ${error.message}`;
+        }
+      }
+
+      async function updateCourse() {
+        if (!authToken) {
+          alert("Please login first");
+          return;
+        }
+
+        const courseId = document.getElementById("updateId").value;
+        if (!courseId) {
+          alert("Please enter a course ID");
+          return;
+        }
+
+        const courseData = {};
+        const code = document.getElementById("updateCode").value;
+        const name = document.getElementById("updateName").value;
+        const semester = document.getElementById("updateSemester").value;
+        const year = document.getElementById("updateYear").value;
+
+        if (code) courseData.code = code;
+        if (name) courseData.name = name;
+        if (semester) courseData.semester = semester;
+        if (year) courseData.academic_year = year;
+
+        if (Object.keys(courseData).length === 0) {
+          alert("Please provide at least one field to update");
+          return;
+        }
+
+        const resultDiv = document.getElementById("updateResult");
+
+        try {
+          const response = await fetch(`${apiUrl}/api/courses/${courseId}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify(courseData),
+          });
+
+          const data = await response.json();
+          resultDiv.style.display = "block";
+
+          if (response.ok) {
+            resultDiv.className = "result success";
+            resultDiv.textContent = `Course updated successfully!\nResponse: ${JSON.stringify(
+              data,
+              null,
+              2
+            )}`;
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent = `Error: ${data.error}`;
+          }
+        } catch (error) {
+          resultDiv.style.display = "block";
+          resultDiv.className = "result error";
+          resultDiv.textContent = `Network error: ${error.message}`;
+        }
+      }
+
+      async function deleteCourse() {
+        if (!authToken) {
+          alert("Please login first");
+          return;
+        }
+
+        const courseId = document.getElementById("deleteId").value;
+        if (!courseId) {
+          alert("Please enter a course ID");
+          return;
+        }
+
+        if (
+          !confirm(
+            `Are you sure you want to delete course with ID ${courseId}? This action cannot be undone.`
+          )
+        ) {
+          return;
+        }
+
+        const resultDiv = document.getElementById("deleteResult");
+
+        try {
+          const response = await fetch(`${apiUrl}/api/courses/${courseId}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+
+          const data = await response.json();
+          resultDiv.style.display = "block";
+
+          if (response.ok) {
+            resultDiv.className = "result success";
+            resultDiv.textContent = `Course deleted successfully!\nResponse: ${JSON.stringify(
+              data,
+              null,
+              2
+            )}`;
+
+            // Clear the input
+            document.getElementById("deleteId").value = "";
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent = `Error: ${data.error}`;
+          }
+        } catch (error) {
+          resultDiv.style.display = "block";
+          resultDiv.className = "result error";
+          resultDiv.textContent = `Network error: ${error.message}`;
+        }
+      }
+    </script>
+  </body>
+</html>

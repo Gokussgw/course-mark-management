@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Test Marks API</title>
+  </head>
+  <body>
+    <h1>Test Marks API</h1>
+    <button onclick="testLogin()">Test Login</button>
+    <button onclick="testMarksAPI()">Test Marks API</button>
+    <div id="results"></div>
+
+    <script>
+      let currentUser = null;
+
+      async function testLogin() {
+        const resultsDiv = document.getElementById("results");
+
+        try {
+          const response = await fetch("http://localhost/db-api.php", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify({
+              email: "lecturer1@example.com",
+              password: "password",
+            }),
+          });
+
+          const data = await response.json();
+          currentUser = data.user;
+
+          resultsDiv.innerHTML =
+            "<h3>Login Result:</h3><pre>" +
+            JSON.stringify(data, null, 2) +
+            "</pre>";
+        } catch (error) {
+          resultsDiv.innerHTML =
+            "<h3>Login Error:</h3><pre>" + error.message + "</pre>";
+        }
+      }
+
+      async function testMarksAPI() {
+        const resultsDiv = document.getElementById("results");
+
+        if (!currentUser) {
+          resultsDiv.innerHTML = "<h3>Error:</h3><p>Please login first</p>";
+          return;
+        }
+
+        try {
+          const response = await fetch(
+            `http://localhost/marks-api.php?action=lecturer_courses&lecturer_id=${currentUser.id}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              credentials: "include",
+            }
+          );
+
+          const data = await response.json();
+
+          resultsDiv.innerHTML +=
+            "<h3>Marks API Result:</h3><pre>" +
+            JSON.stringify(data, null, 2) +
+            "</pre>";
+        } catch (error) {
+          resultsDiv.innerHTML +=
+            "<h3>Marks API Error:</h3><pre>" + error.message + "</pre>";
+        }
+      }
+    </script>
+  </body>
+</html>
