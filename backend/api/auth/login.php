@@ -1,4 +1,20 @@
 <?php
+require_once __DIR__ . '/../../vendor/autoload.php';
+
+use Firebase\JWT\JWT;
+
+// Load environment variables
+$envFile = __DIR__ . '/../../.env';
+if (file_exists($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos($line, '=') !== false && strpos($line, '#') !== 0) {
+            list($key, $value) = explode('=', $line, 2);
+            $_ENV[trim($key)] = trim($value);
+        }
+    }
+}
+
 // CORS headers - Dynamic origin handling
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (preg_match('/^http:\/\/localhost:\d+$/', $origin)) {
@@ -24,36 +40,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = $input['email'] ?? '';
     $password = $input['password'] ?? '';
 
-    // Test credentials
+    // Create JWT token function
+    function createJWTToken($userData)
+    {
+        $jwtSecret = $_ENV['JWT_SECRET'] ?? 'your_jwt_secret_key_here';
+        $issuedAt = time();
+        $expirationTime = $issuedAt + 3600; // Token valid for 1 hour
+
+        $payload = [
+            'iat' => $issuedAt,
+            'exp' => $expirationTime,
+            'id' => $userData['id'],
+            'email' => $userData['email'],
+            'role' => $userData['role'],
+            'name' => $userData['name']
+        ];
+
+        return JWT::encode($payload, $jwtSecret, 'HS256');
+    }
+
+    // Test credentials - these would normally be checked against database
     if ($email === 'admin@example.com' && $password === 'password') {
+        $userData = [
+            'id' => 1,
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
+            'role' => 'admin'
+        ];
         echo json_encode([
-            'token' => 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInJvbGUiOiJhZG1pbiJ9.test',
-            'user' => [
-                'id' => 1,
-                'name' => 'Admin User',
-                'email' => 'admin@example.com',
-                'role' => 'admin'
-            ]
+            'token' => createJWTToken($userData),
+            'user' => $userData
         ]);
     } elseif ($email === 'lecturer1@example.com' && $password === 'password') {
+        $userData = [
+            'id' => 2,
+            'name' => 'Lecturer One',
+            'email' => 'lecturer1@example.com',
+            'role' => 'lecturer'
+        ];
         echo json_encode([
-            'token' => 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MiwiZW1haWwiOiJsZWN0dXJlcjFAZXhhbXBsZS5jb20iLCJyb2xlIjoibGVjdHVyZXIifQ.test',
-            'user' => [
-                'id' => 2,
-                'name' => 'Lecturer One',
-                'email' => 'lecturer1@example.com',
-                'role' => 'lecturer'
-            ]
+            'token' => createJWTToken($userData),
+            'user' => $userData
         ]);
     } elseif ($email === 'student1@example.com' && $password === 'password') {
+        $userData = [
+            'id' => 4,
+            'name' => 'Student One',
+            'email' => 'student1@example.com',
+            'role' => 'student'
+        ];
         echo json_encode([
-            'token' => 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6NCwiZW1haWwiOiJzdHVkZW50MUBleGFtcGxlLmNvbSIsInJvbGUiOiJzdHVkZW50In0.test',
-            'user' => [
-                'id' => 4,
-                'name' => 'Student One',
-                'email' => 'student1@example.com',
-                'role' => 'student'
-            ]
+            'token' => createJWTToken($userData),
+            'user' => $userData
         ]);
     } else {
         http_response_code(401);

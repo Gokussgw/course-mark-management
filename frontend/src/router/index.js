@@ -19,10 +19,12 @@ const StudentMarksView = () => import('../views/student/CourseMarks.vue')
 const StudentSimulation = () => import('../views/student/MarkSimulation.vue')
 const RemarkRequest = () => import('../views/student/RemarkRequest.vue')
 const StudentFeedbackView = () => import('../views/student/FeedbackView.vue')
+const CourseComparison = () => import('../views/student/CourseComparison.vue')
 const AdviseeList = () => import('../views/advisor/AdviseeList.vue')
 const AdviseeDetail = () => import('../views/advisor/AdviseeDetail.vue')
 const AtRiskStudents = () => import('../views/advisor/AtRiskStudents.vue')
 const AdvisorFeedbackView = () => import('../views/advisor/FeedbackView.vue')
+const AdvisorComparisons = () => import('../views/advisor/AdvisorComparisons.vue')
 const MarkBreakdown = () => import('../views/shared/MarkBreakdown.vue')
 const UserManagement = () => import('../views/admin/UserManagement.vue')
 const AdminEnrollmentManagement = () => import('../views/admin/EnrollmentManagement.vue')
@@ -166,6 +168,12 @@ const routes = [
     props: route => ({ courseId: parseInt(route.params.courseId), userRole: 'student' }),
     meta: { requiresAuth: true, role: 'student' }
   },
+  {
+    path: '/student/comparison',
+    name: 'StudentComparison',
+    component: CourseComparison,
+    meta: { requiresAuth: true, role: 'student' }
+  },
   // Advisor routes
   {
     path: '/advisor/dashboard',
@@ -202,6 +210,12 @@ const routes = [
     name: 'AdvisorMarkBreakdown',
     component: MarkBreakdown,
     props: route => ({ courseId: parseInt(route.params.courseId), userRole: 'advisor' }),
+    meta: { requiresAuth: true, role: 'advisor' }
+  },
+  {
+    path: '/advisor/comparisons',
+    name: 'AdvisorComparisons',
+    component: AdvisorComparisons,
     meta: { requiresAuth: true, role: 'advisor' }
   },
   // Admin routes

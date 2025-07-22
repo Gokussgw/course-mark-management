@@ -188,3 +188,79 @@ $app->delete('/api/enrollments/{enrollmentId}', function (Request $request, Resp
         return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
     }
 });
+
+// Get courses for current student
+$app->get('/api/enrollments/student/courses', function (Request $request, Response $response) {
+    try {
+        // Get JWT token from Authorization header
+        $authHeader = $request->getHeaderLine('Authorization');
+        if (empty($authHeader)) {
+            $response->getBody()->write(json_encode([
+                'error' => 'Authorization token required'
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
+        }
+
+        // Extract token from Bearer header
+        if (!preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+            $response->getBody()->write(json_encode([
+                'error' => 'Invalid authorization header format'
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
+        }
+
+        $token = $matches[1];
+
+        // Decode JWT token
+        try {
+            $settings = $this->get('settings');
+            $jwtSecret = $settings['jwt']['secret'];
+            $decoded = \Firebase\JWT\JWT::decode($token, new \Firebase\JWT\Key($jwtSecret, 'HS256'));
+
+            // Check if user is a student
+            if (!$decoded || $decoded->role !== 'student') {
+                $response->getBody()->write(json_encode([
+                    'error' => 'Unauthorized - Student access required'
+                ]));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+            }
+
+            $studentId = $decoded->id;
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'error' => 'Invalid or expired token: ' . $e->getMessage()
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
+        }        // Get database connection
+        $db = $this->get('pdo');
+
+        // Get courses the student is enrolled in
+        $stmt = $db->prepare("
+            SELECT 
+                c.id,
+                c.code,
+                c.name,
+                c.semester,
+                c.academic_year,
+                u.name as lecturer_name,
+                e.created_at as enrolled_at
+            FROM enrollments e 
+            JOIN courses c ON e.course_id = c.id 
+            LEFT JOIN users u ON c.lecturer_id = u.id
+            WHERE e.student_id = ? 
+            ORDER BY c.code
+        ");
+
+        $stmt->execute([$studentId]);
+        $courses = $stmt->fetchAll();
+
+        $response->getBody()->write(json_encode($courses));
+        return $response->withHeader('Content-Type', 'application/json');
+    } catch (Exception $e) {
+        $response->getBody()->write(json_encode([
+            'error' => 'Error fetching student courses: ' . $e->getMessage()
+        ]));
+
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
+    }
+});
