@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Course Detail Update</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-title {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .endpoint {
+            background: #e8f4f8;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        .expected {
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .result {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            min-height: 100px;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .success { color: #27ae60; }
+        .error { color: #e74c3c; }
+        .component-data {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .component-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .component-card h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <h1>Course Detail Update Test</h1>
+    <p>Testing the updated CourseDetail.vue component to use component-based data from final_marks_custom table</p>
+
+    <div class="test-section">
+        <h2 class="test-title">1. Test Course Breakdown API</h2>
+        <div class="endpoint">GET http://localhost:8080/breakdown-api.php?action=course_breakdown&course_id=1</div>
+        <div class="expected">
+            Expected: Component breakdown with assignment, quiz, test, final_exam statistics
+        </div>
+        <button onclick="testCourseBreakdown()">Test Course Breakdown</button>
+        <div id="breakdown-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">2. Test Students Marks API</h2>
+        <div class="endpoint">GET http://localhost:8080/marks-api.php?action=course_students_with_marks&course_id=1</div>
+        <div class="expected">
+            Expected: Students with component marks from final_marks_custom table
+        </div>
+        <button onclick="testStudentsMarks()">Test Students Marks</button>
+        <div id="students-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">3. Test Course Students List API</h2>
+        <div class="endpoint">GET http://localhost:8080/marks-api.php?action=course_students_list&course_id=1</div>
+        <div class="expected">
+            Expected: Basic list of students enrolled in the course
+        </div>
+        <button onclick="testStudentsList()">Test Students List</button>
+        <div id="students-list-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">4. Access Frontend Course Detail Page</h2>
+        <div class="endpoint">http://localhost:8081/lecturer/course/1</div>
+        <div class="expected">
+            Expected: Component breakdown view instead of assessment breakdown, student progress based on component completion
+        </div>
+        <button onclick="openFrontendPage()">Open Frontend Page</button>
+        <div class="expected">
+            <strong>What to look for:</strong>
+            <ul>
+                <li>Component Breakdown section with Assignment (25%), Quiz (20%), Test (25%), Final Exam (30%)</li>
+                <li>Component statistics cards showing class averages and completion rates</li>
+                <li>Student list with completion progress based on component marks</li>
+                <li>Final grades displayed for students instead of percentage calculations</li>
+                <li>"View Detailed Analytics" button linking to breakdown page</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">5. Component Statistics Display</h2>
+        <div id="component-display" class="component-data">
+            <!-- Will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        async function testCourseBreakdown() {
+            const resultDiv = document.getElementById('breakdown-result');
+            resultDiv.innerHTML = '<p>Testing course breakdown API...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:8080/breakdown-api.php?action=course_breakdown&course_id=1');
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="error">✗ API Error: ${data.error}</div>`;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="success">✓ API Response Successful</div>
+                        <h4>Component Breakdown Data:</h4>
+                        <pre>${JSON.stringify(data.component_breakdown, null, 2)}</pre>
+                        <h4>Statistics:</h4>
+                        <pre>${JSON.stringify(data.statistics, null, 2)}</pre>
+                    `;
+                    displayComponentStats(data);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">✗ Request Failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testStudentsMarks() {
+            const resultDiv = document.getElementById('students-result');
+            resultDiv.innerHTML = '<p>Testing students marks API...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:8080/marks-api.php?action=course_students_with_marks&course_id=1');
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✓ API Response Successful</div>
+                        <h4>Students Data (first 3):</h4>
+                        <pre>${JSON.stringify(data.students.slice(0, 3), null, 2)}</pre>
+                        <p><strong>Total Students:</strong> ${data.students.length}</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">✗ API Error: ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">✗ Request Failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testStudentsList() {
+            const resultDiv = document.getElementById('students-list-result');
+            resultDiv.innerHTML = '<p>Testing students list API...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:8080/marks-api.php?action=course_students_list&course_id=1');
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✓ API Response Successful</div>
+                        <h4>Students List (first 3):</h4>
+                        <pre>${JSON.stringify(data.students.slice(0, 3), null, 2)}</pre>
+                        <p><strong>Total Students:</strong> ${data.students.length}</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">✗ API Error: ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">✗ Request Failed: ${error.message}</div>`;
+            }
+        }
+
+        function openFrontendPage() {
+            window.open('http://localhost:8081/lecturer/course/1', '_blank');
+        }
+
+        function displayComponentStats(breakdown) {
+            const displayDiv = document.getElementById('component-display');
+            const components = ['assignment', 'quiz', 'test', 'final_exam'];
+            const weights = { assignment: 25, quiz: 20, test: 25, final_exam: 30 };
+            
+            if (!breakdown.component_breakdown) {
+                displayDiv.innerHTML = '<p>No component breakdown data available</p>';
+                return;
+            }
+            
+            displayDiv.innerHTML = breakdown.component_breakdown.map(component => {
+                return `
+                    <div class="component-card">
+                        <h4>${component.name} (${component.weightage}%)</h4>
+                        <p><strong>Average:</strong> ${Math.round(component.average_percentage || 0)}%</p>
+                        <p><strong>Submissions:</strong> ${component.submissions || 0}/${component.total_students || 0}</p>
+                        <p><strong>Weightage:</strong> ${component.weightage}%</p>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Auto-test on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                testCourseBreakdown();
+                setTimeout(() => testStudentsMarks(), 1000);
+                setTimeout(() => testStudentsList(), 2000);
+            }, 500);
+        });
+    </script>
+</body>
+</html>

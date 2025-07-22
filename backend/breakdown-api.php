@@ -101,73 +101,78 @@ function getCourseBreakdown($pdo)
             return;
         }
 
-        // Get all assessments for the course
-        $assessmentsStmt = $pdo->prepare("
-            SELECT id, name, type, max_mark, weightage, date 
-            FROM assessments 
-            WHERE course_id = ? 
-            ORDER BY date ASC
-        ");
-        $assessmentsStmt->execute([$courseId]);
-        $assessments = $assessmentsStmt->fetchAll();
+        // Get all assessments for the course - now using component types
+        $components = [
+            ['type' => 'assignment', 'name' => 'Assignment', 'weightage' => 25, 'max_mark' => 100],
+            ['type' => 'quiz', 'name' => 'Quiz', 'weightage' => 20, 'max_mark' => 100], 
+            ['type' => 'test', 'name' => 'Test', 'weightage' => 25, 'max_mark' => 100],
+            ['type' => 'final_exam', 'name' => 'Final Exam', 'weightage' => 30, 'max_mark' => 100]
+        ];
 
-        // Get all students enrolled in the course with their marks
+        // Get all students enrolled in the course with their marks from final_marks_custom
         $studentsStmt = $pdo->prepare("
             SELECT DISTINCT
                 u.id,
                 u.name,
                 u.email,
-                u.matric_number
+                u.matric_number,
+                fm.assignment_mark,
+                fm.assignment_percentage,
+                fm.quiz_mark,
+                fm.quiz_percentage,
+                fm.test_mark,
+                fm.test_percentage,
+                fm.final_exam_mark,
+                fm.final_exam_percentage,
+                fm.component_total,
+                fm.final_grade,
+                fm.letter_grade,
+                fm.gpa
             FROM enrollments e
             JOIN users u ON e.student_id = u.id
+            LEFT JOIN final_marks_custom fm ON e.student_id = fm.student_id AND e.course_id = fm.course_id
             WHERE e.course_id = ?
             ORDER BY u.name
         ");
         $studentsStmt->execute([$courseId]);
         $students = $studentsStmt->fetchAll();
 
-        // Get marks for all students and assessments
+        // Structure marks data for each student
         foreach ($students as &$student) {
-            $student['marks'] = [];
-            $student['finalMark'] = 0;
-
-            $marksStmt = $pdo->prepare("
-                SELECT 
-                    a.id as assessment_id,
-                    a.type,
-                    a.name as assessment_name,
-                    a.max_mark,
-                    a.weightage,
-                    m.mark,
-                    ROUND((m.mark / a.max_mark) * 100, 2) as percentage,
-                    ROUND((m.mark / a.max_mark) * a.weightage, 2) as weighted_score
-                FROM marks m
-                JOIN assessments a ON m.assessment_id = a.id
-                WHERE m.student_id = ? AND a.course_id = ?
-            ");
-            $marksStmt->execute([$student['id'], $courseId]);
-            $marks = $marksStmt->fetchAll();
-
-            $totalWeighted = 0;
-            foreach ($marks as $mark) {
-                $student['marks'][$mark['type']] = [
-                    'assessment_id' => $mark['assessment_id'],
-                    'assessment_name' => $mark['assessment_name'],
-                    'obtained' => $mark['mark'],
-                    'max_mark' => $mark['max_mark'],
-                    'percentage' => $mark['percentage'],
-                    'weighted' => $mark['weighted_score']
-                ];
-                $totalWeighted += $mark['weighted_score'];
-            }
-
-            $student['finalMark'] = round($totalWeighted, 2);
-            $student['grade'] = calculateGrade($student['finalMark']);
+            $student['marks'] = [
+                'assignment' => [
+                    'obtained' => $student['assignment_mark'] ?? 0,
+                    'max_mark' => 100,
+                    'percentage' => $student['assignment_percentage'] ?? 0,
+                    'weighted' => ($student['assignment_percentage'] ?? 0) * 0.25
+                ],
+                'quiz' => [
+                    'obtained' => $student['quiz_mark'] ?? 0,
+                    'max_mark' => 100,
+                    'percentage' => $student['quiz_percentage'] ?? 0,
+                    'weighted' => ($student['quiz_percentage'] ?? 0) * 0.20
+                ],
+                'test' => [
+                    'obtained' => $student['test_mark'] ?? 0,
+                    'max_mark' => 100,
+                    'percentage' => $student['test_percentage'] ?? 0,
+                    'weighted' => ($student['test_percentage'] ?? 0) * 0.25
+                ],
+                'final_exam' => [
+                    'obtained' => $student['final_exam_mark'] ?? 0,
+                    'max_mark' => 100,
+                    'percentage' => $student['final_exam_percentage'] ?? 0,
+                    'weighted' => ($student['final_exam_percentage'] ?? 0) * 0.30
+                ]
+            ];
+            
+            $student['finalMark'] = $student['final_grade'] ?? 0;
+            $student['grade'] = $student['letter_grade'] ?? 'F';
         }
 
         // Calculate course statistics
         $totalStudents = count($students);
-        $totalAssessments = count($assessments);
+        $totalComponents = count($components);
 
         $classTotal = array_sum(array_column($students, 'finalMark'));
         $classAverage = $totalStudents > 0 ? round($classTotal / $totalStudents, 2) : 0;
@@ -176,25 +181,25 @@ function getCourseBreakdown($pdo)
             return $s['finalMark'] < 50;
         }));
 
-        // Assessment breakdown statistics
-        $assessmentBreakdown = [];
-        foreach ($assessments as $assessment) {
+        // Component breakdown statistics
+        $componentBreakdown = [];
+        foreach ($components as $component) {
             $submissionCount = 0;
             $totalObtained = 0;
             $totalPossible = 0;
 
             foreach ($students as $student) {
-                if (isset($student['marks'][$assessment['type']])) {
+                if (isset($student['marks'][$component['type']])) {
                     $submissionCount++;
-                    $totalObtained += $student['marks'][$assessment['type']]['obtained'];
-                    $totalPossible += $student['marks'][$assessment['type']]['max_mark'];
+                    $totalObtained += $student['marks'][$component['type']]['obtained'];
+                    $totalPossible += $student['marks'][$component['type']]['max_mark'];
                 }
             }
 
-            $assessmentBreakdown[] = [
-                'type' => $assessment['type'],
-                'name' => $assessment['name'],
-                'weightage' => $assessment['weightage'],
+            $componentBreakdown[] = [
+                'type' => $component['type'],
+                'name' => $component['name'],
+                'weightage' => $component['weightage'],
                 'submissions' => $submissionCount,
                 'total_students' => $totalStudents,
                 'average_percentage' => $totalPossible > 0 ? round(($totalObtained / $totalPossible) * 100, 2) : 0
@@ -204,14 +209,14 @@ function getCourseBreakdown($pdo)
         echo json_encode([
             'course' => $course,
             'students' => $students,
-            'assessments' => $assessments,
+            'components' => $components,
             'statistics' => [
                 'total_students' => $totalStudents,
-                'total_assessments' => $totalAssessments,
+                'total_components' => $totalComponents,
                 'class_average' => $classAverage,
                 'at_risk_students' => $atRiskStudents
             ],
-            'assessment_breakdown' => $assessmentBreakdown
+            'component_breakdown' => $componentBreakdown
         ]);
     } catch (Exception $e) {
         http_response_code(500);
@@ -248,82 +253,163 @@ function getStudentBreakdown($pdo)
             return;
         }
 
-        // Get detailed assessment performance
+        // Get detailed component performance from final_marks_custom
         $performanceStmt = $pdo->prepare("
             SELECT 
-                a.id,
-                a.name,
-                a.type,
-                a.max_mark,
-                a.weightage,
-                a.date,
-                COALESCE(m.mark, 0) as mark,
-                CASE 
-                    WHEN m.mark IS NOT NULL 
-                    THEN ROUND((m.mark / a.max_mark) * 100, 2)
-                    ELSE 0 
-                END as percentage,
-                CASE 
-                    WHEN m.mark IS NOT NULL 
-                    THEN ROUND((m.mark / a.max_mark) * a.weightage, 2)
-                    ELSE 0 
-                END as weighted_score
-            FROM assessments a
-            LEFT JOIN marks m ON a.id = m.assessment_id AND m.student_id = ?
-            WHERE a.course_id = ?
-            ORDER BY a.date ASC
+                fm.assignment_mark,
+                fm.assignment_percentage,
+                fm.quiz_mark,
+                fm.quiz_percentage,
+                fm.test_mark,
+                fm.test_percentage,
+                fm.final_exam_mark,
+                fm.final_exam_percentage,
+                fm.component_total,
+                fm.final_grade,
+                fm.letter_grade,
+                fm.gpa,
+                fm.created_at,
+                fm.updated_at
+            FROM final_marks_custom fm
+            WHERE fm.student_id = ? AND fm.course_id = ?
         ");
         $performanceStmt->execute([$studentId, $courseId]);
-        $assessmentPerformance = $performanceStmt->fetchAll();
+        $studentMarks = $performanceStmt->fetch();
 
-        // Calculate class averages for each assessment
-        foreach ($assessmentPerformance as &$assessment) {
+        if (!$studentMarks) {
+            // Return default structure if no marks found
+            $studentMarks = [
+                'assignment_mark' => 0,
+                'assignment_percentage' => 0,
+                'quiz_mark' => 0,
+                'quiz_percentage' => 0,
+                'test_mark' => 0,
+                'test_percentage' => 0,
+                'final_exam_mark' => 0,
+                'final_exam_percentage' => 0,
+                'component_total' => 0,
+                'final_grade' => 0,
+                'letter_grade' => 'F',
+                'gpa' => 0.00
+            ];
+        }
+
+        // Structure component performance
+        $componentPerformance = [
+            [
+                'type' => 'assignment',
+                'name' => 'Assignment',
+                'max_mark' => 100,
+                'weightage' => 25,
+                'mark' => $studentMarks['assignment_mark'],
+                'percentage' => $studentMarks['assignment_percentage'],
+                'weighted_score' => ($studentMarks['assignment_percentage'] * 25) / 100
+            ],
+            [
+                'type' => 'quiz',
+                'name' => 'Quiz',
+                'max_mark' => 100,
+                'weightage' => 20,
+                'mark' => $studentMarks['quiz_mark'],
+                'percentage' => $studentMarks['quiz_percentage'],
+                'weighted_score' => ($studentMarks['quiz_percentage'] * 20) / 100
+            ],
+            [
+                'type' => 'test',
+                'name' => 'Test',
+                'max_mark' => 100,
+                'weightage' => 25,
+                'mark' => $studentMarks['test_mark'],
+                'percentage' => $studentMarks['test_percentage'],
+                'weighted_score' => ($studentMarks['test_percentage'] * 25) / 100
+            ],
+            [
+                'type' => 'final_exam',
+                'name' => 'Final Exam',
+                'max_mark' => 100,
+                'weightage' => 30,
+                'mark' => $studentMarks['final_exam_mark'],
+                'percentage' => $studentMarks['final_exam_percentage'],
+                'weighted_score' => ($studentMarks['final_exam_percentage'] * 30) / 100
+            ]
+        ];
+
+        // Calculate class averages for each component
+        foreach ($componentPerformance as &$component) {
+            $columnName = $component['type'] . '_mark';
             $classAvgStmt = $pdo->prepare("
                 SELECT 
-                    AVG(COALESCE((m.mark / a.max_mark) * 100, 0)) as class_average
-                FROM assessments a
-                LEFT JOIN marks m ON a.id = m.assessment_id
-                WHERE a.id = ?
+                    AVG(COALESCE(fm.$columnName, 0)) as class_average
+                FROM final_marks_custom fm
+                INNER JOIN enrollments e ON fm.student_id = e.student_id
+                WHERE fm.course_id = ? AND e.course_id = ?
             ");
-            $classAvgStmt->execute([$assessment['id']]);
+            $classAvgStmt->execute([$courseId, $courseId]);
             $classAvgResult = $classAvgStmt->fetch();
-            $assessment['class_average'] = round($classAvgResult['class_average'] ?? 0, 2);
+            $component['class_average'] = round($classAvgResult['class_average'] ?? 0, 2);
         }
 
         // Calculate overall statistics
-        $totalWeighted = array_sum(array_column($assessmentPerformance, 'weighted_score'));
-        $finalMark = round($totalWeighted, 2);
-        $grade = calculateGrade($finalMark);
+        $finalMark = $studentMarks['final_grade'];
+        $grade = $studentMarks['letter_grade'];
 
-        // Calculate class rank
+        // Calculate class rank using final_grade
         $rankStmt = $pdo->prepare("
             SELECT COUNT(*) + 1 as rank
-            FROM (
-                SELECT 
-                    e.student_id,
-                    SUM(COALESCE((m.mark / a.max_mark) * a.weightage, 0)) as total_weighted
-                FROM enrollments e
-                LEFT JOIN marks m ON e.student_id = m.student_id
-                LEFT JOIN assessments a ON m.assessment_id = a.id AND a.course_id = e.course_id
-                WHERE e.course_id = ?
-                GROUP BY e.student_id
-                HAVING total_weighted > ?
-            ) higher_scores
+            FROM final_marks_custom fm
+            INNER JOIN enrollments e ON fm.student_id = e.student_id
+            WHERE fm.course_id = ? AND e.course_id = ? AND fm.final_grade > ?
         ");
-        $rankStmt->execute([$courseId, $totalWeighted]);
+        $rankStmt->execute([$courseId, $courseId, $finalMark]);
         $rankResult = $rankStmt->fetch();
         $rank = $rankResult['rank'] ?? 1;
 
-        // Analyze performance trends
-        $trends = analyzePerformanceTrends($assessmentPerformance);
+        // Get total students in course
+        $totalStmt = $pdo->prepare("
+            SELECT COUNT(DISTINCT student_id) as total
+            FROM enrollments
+            WHERE course_id = ?
+        ");
+        $totalStmt->execute([$courseId]);
+        $totalResult = $totalStmt->fetch();
+        $totalStudents = $totalResult['total'] ?? 1;
+
+        // Analyze performance trends (simplified for components)
+        $trends = [
+            'strongest_component' => '',
+            'weakest_component' => '',
+            'improvement_needed' => []
+        ];
+
+        $componentScores = [];
+        foreach ($componentPerformance as $component) {
+            $componentScores[$component['type']] = $component['percentage'];
+        }
+
+        if (!empty($componentScores)) {
+            $maxScore = max($componentScores);
+            $minScore = min($componentScores);
+            $trends['strongest_component'] = array_search($maxScore, $componentScores);
+            $trends['weakest_component'] = array_search($minScore, $componentScores);
+            
+            foreach ($componentScores as $type => $score) {
+                if ($score < 60) {
+                    $trends['improvement_needed'][] = $type;
+                }
+            }
+        }
 
         echo json_encode([
             'student' => $student,
-            'assessment_performance' => $assessmentPerformance,
-            'final_mark' => $finalMark,
-            'grade' => $grade,
-            'rank' => $rank,
-            'trends' => $trends
+            'component_performance' => $componentPerformance,
+            'overall_statistics' => [
+                'final_mark' => $finalMark,
+                'grade' => $grade,
+                'gpa' => $studentMarks['gpa'],
+                'rank' => $rank,
+                'total_students' => $totalStudents
+            ],
+            'performance_trends' => $trends
         ]);
     } catch (Exception $e) {
         http_response_code(500);
@@ -419,52 +505,90 @@ function getClassPerformance($pdo)
     }
 
     try {
-        // Get grade distribution
+        // Get grade distribution using final_marks_custom
         $gradeDistStmt = $pdo->prepare("
             SELECT 
-                CASE 
-                    WHEN total_weighted >= 80 THEN 'A'
-                    WHEN total_weighted >= 70 THEN 'B'
-                    WHEN total_weighted >= 60 THEN 'C'
-                    WHEN total_weighted >= 50 THEN 'D'
-                    ELSE 'F'
-                END as grade,
+                fm.letter_grade as grade,
                 COUNT(*) as count
-            FROM (
-                SELECT 
-                    e.student_id,
-                    SUM(COALESCE((m.mark / a.max_mark) * a.weightage, 0)) as total_weighted
-                FROM enrollments e
-                LEFT JOIN marks m ON e.student_id = m.student_id
-                LEFT JOIN assessments a ON m.assessment_id = a.id AND a.course_id = e.course_id
-                WHERE e.course_id = ?
-                GROUP BY e.student_id
-            ) student_totals
-            GROUP BY grade
-            ORDER BY grade
+            FROM enrollments e
+            LEFT JOIN final_marks_custom fm ON e.student_id = fm.student_id AND e.course_id = fm.course_id
+            WHERE e.course_id = ?
+            GROUP BY fm.letter_grade
+            ORDER BY fm.letter_grade
         ");
         $gradeDistStmt->execute([$courseId]);
         $gradeDistribution = $gradeDistStmt->fetchAll();
 
-        // Get performance by assessment type
-        $typePerformanceStmt = $pdo->prepare("
+        // Get performance by component type
+        $componentPerformanceStmt = $pdo->prepare("
             SELECT 
-                a.type,
-                AVG((m.mark / a.max_mark) * 100) as average_percentage,
-                COUNT(m.id) as submissions,
-                COUNT(DISTINCT e.student_id) as total_students
-            FROM assessments a
-            LEFT JOIN marks m ON a.id = m.assessment_id
-            LEFT JOIN enrollments e ON a.course_id = e.course_id
-            WHERE a.course_id = ?
-            GROUP BY a.type
+                'assignment' as component_type,
+                'Assignment' as component_name,
+                AVG(fm.assignment_percentage) as average_percentage,
+                COUNT(fm.assignment_mark) as submissions,
+                25 as weightage
+            FROM enrollments e
+            LEFT JOIN final_marks_custom fm ON e.student_id = fm.student_id AND e.course_id = fm.course_id
+            WHERE e.course_id = ?
+            
+            UNION ALL
+            
+            SELECT 
+                'quiz' as component_type,
+                'Quiz' as component_name,
+                AVG(fm.quiz_percentage) as average_percentage,
+                COUNT(fm.quiz_mark) as submissions,
+                20 as weightage
+            FROM enrollments e
+            LEFT JOIN final_marks_custom fm ON e.student_id = fm.student_id AND e.course_id = fm.course_id
+            WHERE e.course_id = ?
+            
+            UNION ALL
+            
+            SELECT 
+                'test' as component_type,
+                'Test' as component_name,
+                AVG(fm.test_percentage) as average_percentage,
+                COUNT(fm.test_mark) as submissions,
+                25 as weightage
+            FROM enrollments e
+            LEFT JOIN final_marks_custom fm ON e.student_id = fm.student_id AND e.course_id = fm.course_id
+            WHERE e.course_id = ?
+            
+            UNION ALL
+            
+            SELECT 
+                'final_exam' as component_type,
+                'Final Exam' as component_name,
+                AVG(fm.final_exam_percentage) as average_percentage,
+                COUNT(fm.final_exam_mark) as submissions,
+                30 as weightage
+            FROM enrollments e
+            LEFT JOIN final_marks_custom fm ON e.student_id = fm.student_id AND e.course_id = fm.course_id
+            WHERE e.course_id = ?
         ");
-        $typePerformanceStmt->execute([$courseId]);
-        $typePerformance = $typePerformanceStmt->fetchAll();
+        $componentPerformanceStmt->execute([$courseId, $courseId, $courseId, $courseId]);
+        $componentPerformance = $componentPerformanceStmt->fetchAll();
+
+        // Get overall class statistics
+        $overallStatsStmt = $pdo->prepare("
+            SELECT 
+                COUNT(DISTINCT e.student_id) as total_students,
+                AVG(fm.final_grade) as class_average,
+                MAX(fm.final_grade) as highest_grade,
+                MIN(fm.final_grade) as lowest_grade,
+                STDDEV(fm.final_grade) as grade_deviation
+            FROM enrollments e
+            LEFT JOIN final_marks_custom fm ON e.student_id = fm.student_id AND e.course_id = fm.course_id
+            WHERE e.course_id = ?
+        ");
+        $overallStatsStmt->execute([$courseId]);
+        $overallStats = $overallStatsStmt->fetch();
 
         echo json_encode([
             'grade_distribution' => $gradeDistribution,
-            'type_performance' => $typePerformance
+            'component_performance' => $componentPerformance,
+            'overall_statistics' => $overallStats
         ]);
     } catch (Exception $e) {
         http_response_code(500);
@@ -472,11 +596,11 @@ function getClassPerformance($pdo)
     }
 }
 
-// Get assessment analytics
+// Get component analytics (updated from assessment analytics)
 function getAssessmentAnalytics($pdo)
 {
     $courseId = $_GET['course_id'] ?? null;
-    $assessmentId = $_GET['assessment_id'] ?? null;
+    $componentType = $_GET['component_type'] ?? null; // assignment, quiz, test, final_exam
 
     if (!$courseId) {
         http_response_code(400);
@@ -485,42 +609,58 @@ function getAssessmentAnalytics($pdo)
     }
 
     try {
-        $whereClause = "WHERE a.course_id = ?";
-        $params = [$courseId];
+        $components = ['assignment', 'quiz', 'test', 'final_exam'];
+        $componentData = [];
 
-        if ($assessmentId) {
-            $whereClause .= " AND a.id = ?";
-            $params[] = $assessmentId;
+        foreach ($components as $component) {
+            if ($componentType && $componentType !== $component) {
+                continue; // Skip if specific component requested and this isn't it
+            }
+
+            $markColumn = $component . '_mark';
+            $percentageColumn = $component . '_percentage';
+            
+            $analyticsStmt = $pdo->prepare("
+                SELECT 
+                    '$component' as component_type,
+                    CASE 
+                        WHEN '$component' = 'assignment' THEN 'Assignment'
+                        WHEN '$component' = 'quiz' THEN 'Quiz'
+                        WHEN '$component' = 'test' THEN 'Test'
+                        WHEN '$component' = 'final_exam' THEN 'Final Exam'
+                    END as component_name,
+                    CASE 
+                        WHEN '$component' = 'assignment' THEN 25
+                        WHEN '$component' = 'quiz' THEN 20
+                        WHEN '$component' = 'test' THEN 25
+                        WHEN '$component' = 'final_exam' THEN 30
+                    END as weightage,
+                    COUNT(fm.$markColumn) as submissions,
+                    COUNT(DISTINCT e.student_id) as total_enrolled,
+                    ROUND(AVG(fm.$markColumn), 2) as average_mark,
+                    ROUND(AVG(fm.$percentageColumn), 2) as average_percentage,
+                    MAX(fm.$markColumn) as highest_mark,
+                    MIN(fm.$markColumn) as lowest_mark,
+                    ROUND(STDDEV(fm.$markColumn), 2) as standard_deviation,
+                    SUM(CASE WHEN fm.$percentageColumn >= 80 THEN 1 ELSE 0 END) as excellent_count,
+                    SUM(CASE WHEN fm.$percentageColumn >= 60 AND fm.$percentageColumn < 80 THEN 1 ELSE 0 END) as good_count,
+                    SUM(CASE WHEN fm.$percentageColumn >= 40 AND fm.$percentageColumn < 60 THEN 1 ELSE 0 END) as fair_count,
+                    SUM(CASE WHEN fm.$percentageColumn < 40 THEN 1 ELSE 0 END) as poor_count
+                FROM enrollments e
+                LEFT JOIN final_marks_custom fm ON e.student_id = fm.student_id AND e.course_id = fm.course_id
+                WHERE e.course_id = ?
+            ");
+            $analyticsStmt->execute([$courseId]);
+            $componentData[] = $analyticsStmt->fetch();
         }
 
-        $analyticsStmt = $pdo->prepare("
-            SELECT 
-                a.id,
-                a.name,
-                a.type,
-                a.max_mark,
-                a.weightage,
-                COUNT(m.id) as submissions,
-                COUNT(DISTINCT e.student_id) as total_enrolled,
-                AVG(m.mark) as avg_raw_score,
-                AVG((m.mark / a.max_mark) * 100) as avg_percentage,
-                MIN(m.mark) as min_score,
-                MAX(m.mark) as max_score,
-                STDDEV((m.mark / a.max_mark) * 100) as std_deviation
-            FROM assessments a
-            LEFT JOIN marks m ON a.id = m.assessment_id
-            LEFT JOIN enrollments e ON a.course_id = e.course_id
-            $whereClause
-            GROUP BY a.id, a.name, a.type, a.max_mark, a.weightage
-            ORDER BY a.date
-        ");
-        $analyticsStmt->execute($params);
-        $analytics = $analyticsStmt->fetchAll();
-
-        echo json_encode(['analytics' => $analytics]);
+        echo json_encode([
+            'course_id' => $courseId,
+            'component_analytics' => $componentData
+        ]);
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get assessment analytics: ' . $e->getMessage()]);
+        echo json_encode(['error' => 'Failed to get component analytics: ' . $e->getMessage()]);
     }
 }
 

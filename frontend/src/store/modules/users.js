@@ -8,7 +8,8 @@ export default {
     students: [],
     lecturers: [],
     advisors: [],
-    advisees: []
+    advisees: [],
+    courseStudents: []
   },
   getters: {
     getAllUsers: state => state.users,
@@ -95,6 +96,9 @@ export default {
       if (state.user && state.user.id === userId) {
         state.user = null;
       }
+    },
+    setCourseStudents(state, students) {
+      state.courseStudents = students;
     }
   },
   actions: {

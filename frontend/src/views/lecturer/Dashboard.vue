@@ -9,7 +9,9 @@
       <div class="d-flex align-items-center gap-3">
         <router-link 
           to="/lecturer/marks" 
-          class="btn btn-success"
+ import { mapGetters } from 'vuex'
+import MarkDistributionChart from '@/components/charts/MarkDistributionChart.vue';
+import ComponentChart from '@/components/charts/ComponentChart.vue';      class="btn btn-success"
           title="Manage Marks"
         >
           <i class="fas fa-graduation-cap me-2"></i>Manage Marks
@@ -79,7 +81,7 @@
                   </div>
                   <div class="d-flex align-items-center gap-2">
                     <span class="badge bg-primary rounded-pill">
-                      {{ getAssessmentCountForCourse(course.id) }} assessments
+                      4 components
                     </span>
                     <div class="btn-group" role="group">
                       <router-link 
@@ -154,9 +156,9 @@
       <div class="col-md-6 mb-4">
         <div class="card h-100">
           <div class="card-body">
-            <h5 class="card-title">Assessment Types</h5>
-            <p class="card-text text-muted mb-3">Distribution of assessment types across courses</p>
-            <AssessmentChart :assessments="assessments" :height="250" />
+            <h5 class="card-title">Component Types</h5>
+            <p class="card-text text-muted mb-3">Standard component weightage distribution</p>
+            <ComponentChart :components="standardComponents" :height="250" />
           </div>
         </div>
       </div>
@@ -177,12 +179,12 @@
         <div class="card">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-2">
-              <h5 class="card-title mb-0">Assessment Overview</h5>
-              <button class="btn btn-sm btn-success" @click="exportAssessmentsToCSV">
+              <h5 class="card-title mb-0">Component Overview</h5>
+              <button class="btn btn-sm btn-success" @click="exportMarksToCSV">
                 <i class="fas fa-file-export me-2"></i>Export Marks
               </button>
             </div>
-            <p class="card-text text-muted mb-4">Current status of assessments across all courses</p>
+            <p class="card-text text-muted mb-4">Current status of component marks across all courses</p>
             
             <div v-if="isLoading" class="text-center">
               <div class="spinner-border text-primary" role="status">
@@ -194,48 +196,46 @@
               <thead>
                 <tr>
                   <th>Course</th>
-                  <th>Assessment</th>
-                  <th>Type</th>
-                  <th>Date</th>
-                  <th>Status</th>
+                  <th>Component</th>
+                  <th>Weightage</th>
+                  <th>Completed</th>
+                  <th>Average</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="assessment in upcomingAssessments" :key="assessment.id">
-                  <td>{{ getCourseNameById(assessment.course_id) }}</td>
-                  <td>{{ assessment.name }}</td>
+                <tr v-for="component in courseComponents" :key="`${component.course_id}-${component.type}`">
+                  <td>{{ getCourseNameById(component.course_id) }}</td>
                   <td>
-                    <span class="badge" :class="getAssessmentTypeBadgeClass(assessment.type)">
-                      {{ assessment.type }}
+                    <span class="badge" :class="getComponentTypeBadgeClass(component.type)">
+                      {{ component.name }}
                     </span>
                   </td>
-                  <td>{{ formatDate(assessment.date) }}</td>
+                  <td>{{ component.weightage }}%</td>
                   <td>
-                    <span class="badge bg-warning" v-if="isPending(assessment)">Pending</span>
-                    <span class="badge bg-success" v-else>Completed</span>
+                    <span class="badge" :class="component.completion_rate >= 80 ? 'bg-success' : component.completion_rate >= 50 ? 'bg-warning' : 'bg-danger'">
+                      {{ component.completed }}/{{ component.total }} ({{ component.completion_rate }}%)
+                    </span>
+                  </td>
+                  <td>
+                    <span :class="getMarkClass(component.average)">
+                      {{ component.average }}%
+                    </span>
                   </td>
                   <td>
                     <div class="btn-group btn-group-sm" role="group">
-                      <router-link :to="`/lecturer/assessment/edit/${assessment.id}`" class="btn btn-outline-primary">
+                      <router-link :to="`/lecturer/course/${component.course_id}/marks`" class="btn btn-outline-primary" :title="`Manage ${component.name} marks`">
                         <i class="fas fa-edit"></i>
                       </router-link>
-                      <router-link :to="`/lecturer/course/${assessment.course_id}`" class="btn btn-outline-info">
-                        <i class="fas fa-eye"></i>
+                      <router-link :to="`/lecturer/breakdown/${component.course_id}`" class="btn btn-outline-info" title="View detailed breakdown">
+                        <i class="fas fa-chart-bar"></i>
                       </router-link>
-                      <button 
-                        class="btn btn-outline-success"
-                        @click="openNotificationModal(assessment)"
-                        title="Notify Students"
-                      >
-                        <i class="fas fa-bell"></i>
-                      </button>
                     </div>
                   </td>
                 </tr>
                 
-                <tr v-if="upcomingAssessments.length === 0">
-                  <td colspan="6" class="text-center">No upcoming assessments</td>
+                <tr v-if="courseComponents.length === 0">
+                  <td colspan="6" class="text-center">No component data available</td>
                 </tr>
               </tbody>
             </table>
@@ -405,14 +405,14 @@
 
 <script>
 import { mapGetters } from 'vuex';
-import AssessmentChart from '@/components/charts/AssessmentChart.vue';
+import ComponentChart from '@/components/charts/ComponentChart.vue';
 import MarkDistributionChart from '@/components/charts/MarkDistributionChart.vue';
 import * as bootstrap from 'bootstrap';
 
 export default {
   name: 'LecturerDashboard',
   components: {
-    AssessmentChart,
+    ComponentChart,
     MarkDistributionChart
   },
   data() {

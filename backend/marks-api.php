@@ -67,6 +67,12 @@ function handleGet()
         case 'course_students_marks':
             getCourseStudentsWithMarks();
             break;
+        case 'course_students_with_marks':
+            getCourseStudentsWithMarks();
+            break;
+        case 'course_students_list':
+            getCourseStudentsList();
+            break;
         case 'student_marks':
             getStudentMarks();
             break;
@@ -186,10 +192,45 @@ function getCourseStudentsWithMarks()
             $student['name'] = $student['student_name'];
         }
 
-        echo json_encode(['students' => $students]);
+        echo json_encode(['success' => true, 'students' => $students]);
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
+    }
+}
+
+function getCourseStudentsList()
+{
+    global $pdo;
+
+    $course_id = $_GET['course_id'] ?? null;
+
+    if (!$course_id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Course ID required']);
+        return;
+    }
+
+    try {
+        // Get basic student list enrolled in the course
+        $stmt = $pdo->prepare("
+            SELECT 
+                u.id,
+                u.name,
+                u.matric_number as student_id,
+                u.email
+            FROM enrollments e
+            INNER JOIN users u ON e.student_id = u.id
+            WHERE e.course_id = ? AND u.role = 'student'
+            ORDER BY u.name
+        ");
+        $stmt->execute([$course_id]);
+        $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(['success' => true, 'students' => $students]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
     }
 }
 

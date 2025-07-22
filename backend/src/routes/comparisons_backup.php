@@ -178,48 +178,98 @@ $app->group('/api/comparisons', function ($group) {
                 WHERE e.course_id = ?
             ');
             $stmt->execute([$courseId]);
-            $totalStudents = $stmt->fetchColumn();
+            $totalStudents = $stmt->fetchColumn(); 
+                    student_ranking.student_id,
+                    student_ranking.total_score,
+                    ROW_NUMBER() OVER (ORDER BY student_ranking.total_score DESC) as rank
+                FROM (
+                    SELECT 
+                        e.student_id,
+                        SUM(
+                            CASE 
+                                WHEN m.mark IS NOT NULL THEN 
+                                    ((m.mark / a.max_mark) * a.weightage)
+                                ELSE 0 
+                            END
+                        ) as total_score
+                    FROM enrollments e
+                    LEFT JOIN assessments a ON a.course_id = e.course_id
+                    LEFT JOIN marks m ON m.assessment_id = a.id AND m.student_id = e.student_id
+                    WHERE e.course_id = ?
+                    GROUP BY e.student_id
+                ) as student_ranking
+                ORDER BY student_ranking.total_score DESC
+            ');
+            $stmt->execute([$courseId]);
+            $rankings = $stmt->fetchAll();
 
-            // Prepare the comparison data structure
+            $studentRank = null;
+            $totalStudents = count($rankings);
+            foreach ($rankings as $index => $ranking) {
+                if ($ranking['student_id'] == $studentId) {
+                    $studentRank = $index + 1;
+                    break;
+                }
+            }
+
+            // Get anonymized coursemate performance (for privacy)
+            $stmt = $pdo->prepare('
+                SELECT COUNT(DISTINCT e.student_id) as total_enrolled
+                FROM enrollments e
+                WHERE e.course_id = ?
+            ');
+            $stmt->execute([$courseId]);
+            $enrollmentInfo = $stmt->fetch();
+
+            // Prepare response
             $comparison = [
-                'course' => [
-                    'id' => $courseId,
-                    'code' => $course['code'],
-                    'name' => $course['name']
+                'course' => $course,
+                'student_performance' => [
+                    'total_score' => round($studentTotal, 2),
+                    'rank' => $studentRank,
+                    'total_students' => $totalStudents
                 ],
-                'student' => [
-                    'position' => $position,
-                    'total_students' => $totalStudents,
-                    'marks' => [
-                        'assignment' => [
-                            'mark' => $studentMarks['assignment_mark'],
-                            'percentage' => $studentMarks['assignment_percentage'],
-                            'class_stats' => $classStats['assignment']
-                        ],
-                        'quiz' => [
-                            'mark' => $studentMarks['quiz_mark'],
-                            'percentage' => $studentMarks['quiz_percentage'],
-                            'class_stats' => $classStats['quiz']
-                        ],
-                        'test' => [
-                            'mark' => $studentMarks['test_mark'],
-                            'percentage' => $studentMarks['test_percentage'],
-                            'class_stats' => $classStats['test']
-                        ],
-                        'final_exam' => [
-                            'mark' => $studentMarks['final_exam_mark'],
-                            'percentage' => $studentMarks['final_exam_percentage'],
-                            'class_stats' => $classStats['final_exam']
-                        ],
-                        'overall' => [
-                            'final_grade' => $studentMarks['final_grade'],
-                            'letter_grade' => $studentMarks['letter_grade'],
-                            'gpa' => $studentMarks['gpa'],
-                            'class_stats' => $classStats['overall']
-                        ]
-                    ]
-                ]
+                'class_performance' => [
+                    'average_score' => round($classTotal, 2),
+                    'total_enrolled' => $enrollmentInfo['total_enrolled']
+                ],
+                'assessments' => []
             ];
+
+            // Add detailed assessment comparison
+            foreach ($studentMarks as $mark) {
+                $assessmentId = $mark['assessment_id'];
+                $stats = $classStats[$assessmentId];
+
+                $studentPercentage = ($mark['student_mark'] / $mark['max_mark']) * 100;
+                $classAvgPercentage = ($stats['class_average'] / $mark['max_mark']) * 100;
+
+                $comparison['assessments'][] = [
+                    'assessment' => [
+                        'name' => $mark['name'],
+                        'type' => $mark['type'],
+                        'max_mark' => $mark['max_mark'],
+                        'weightage' => $mark['weightage']
+                    ],
+                    'student_performance' => [
+                        'mark' => $mark['student_mark'],
+                        'percentage' => round($studentPercentage, 2)
+                    ],
+                    'class_statistics' => [
+                        'average' => $stats['class_average'],
+                        'average_percentage' => round($classAvgPercentage, 2),
+                        'highest' => $stats['highest_mark'],
+                        'lowest' => $stats['lowest_mark'],
+                        'standard_deviation' => $stats['standard_deviation'],
+                        'total_submissions' => $stats['total_submissions'],
+                        'percentiles' => $stats['percentiles']
+                    ],
+                    'comparison' => [
+                        'above_average' => $mark['student_mark'] > $stats['class_average'],
+                        'difference_from_average' => round($mark['student_mark'] - $stats['class_average'], 2)
+                    ]
+                ];
+            }
 
             $response->getBody()->write(json_encode($comparison));
             return $response->withHeader('Content-Type', 'application/json');
@@ -229,39 +279,66 @@ $app->group('/api/comparisons', function ($group) {
         }
     });
 
-    // Get advisor's overall comparison view
-    $group->get('/advisor-overview', function (Request $request, Response $response) {
+    // Get advisor's view of student comparisons
+    $group->get('/advisor/students', function (Request $request, Response $response) {
         $user = $request->getAttribute('user');
         $pdo = $this->get('pdo');
 
-        if (!$user || $user->role !== 'advisor') {
-            $response->getBody()->write(json_encode(['error' => 'Advisor access required']));
-            return $response->withStatus(403)->withHeader('Content-Type', 'application/json');
-        }
-
         try {
-            $advisorId = $user->id;
+            if (!$user || $user->role !== 'advisor') {
+                $response->getBody()->write(json_encode(['error' => 'Advisor access required']));
+                return $response->withStatus(403)->withHeader('Content-Type', 'application/json');
+            }
 
-            // Get summary statistics for advisor's students using final_marks_custom
+            // Get all advisees and their performance summary
             $stmt = $pdo->prepare('
                 SELECT 
-                    COUNT(DISTINCT u.id) as total_students,
-                    ROUND(AVG(fm.gpa), 2) as avg_gpa,
-                    ROUND(AVG(fm.final_grade), 2) as avg_final_grade,
-                    COUNT(DISTINCT fm.course_id) as courses_covered,
-                    SUM(CASE WHEN fm.letter_grade IN ("A", "A-") THEN 1 ELSE 0 END) as excellent_grades,
-                    SUM(CASE WHEN fm.letter_grade IN ("B+", "B", "B-") THEN 1 ELSE 0 END) as good_grades,
-                    SUM(CASE WHEN fm.letter_grade IN ("C+", "C", "C-") THEN 1 ELSE 0 END) as average_grades,
-                    SUM(CASE WHEN fm.letter_grade IN ("D+", "D", "F") THEN 1 ELSE 0 END) as poor_grades
+                    u.id,
+                    u.name,
+                    u.matric_number,
+                    COUNT(DISTINCT e.course_id) as total_courses
                 FROM users u
-                LEFT JOIN final_marks_custom fm ON u.id = fm.student_id
+                LEFT JOIN enrollments e ON u.id = e.student_id
                 WHERE u.advisor_id = ? AND u.role = "student"
+                GROUP BY u.id, u.name, u.matric_number
+                ORDER BY u.name
             ');
-            $stmt->execute([$advisorId]);
-            $overview = $stmt->fetch();
+            $stmt->execute([$user->id]);
+            $advisees = $stmt->fetchAll();
+
+            // Get performance summary for each advisee
+            foreach ($advisees as &$advisee) {
+                $stmt = $pdo->prepare('
+                    SELECT 
+                        c.id as course_id,
+                        c.code,
+                        c.name as course_name,
+                        COUNT(DISTINCT a.id) as total_assessments,
+                        COUNT(DISTINCT m.id) as completed_assessments,
+                        ROUND(AVG(
+                            CASE 
+                                WHEN m.mark IS NOT NULL THEN (m.mark / a.max_mark) * 100
+                                ELSE NULL 
+                            END
+                        ), 2) as average_percentage
+                    FROM enrollments e
+                    INNER JOIN courses c ON e.course_id = c.id
+                    LEFT JOIN assessments a ON c.id = a.course_id
+                    LEFT JOIN marks m ON a.id = m.assessment_id AND m.student_id = e.student_id
+                    WHERE e.student_id = ?
+                    GROUP BY c.id, c.code, c.name
+                    ORDER BY c.code
+                ');
+                $stmt->execute([$advisee['id']]);
+                $advisee['courses'] = $stmt->fetchAll();
+            }
 
             $response->getBody()->write(json_encode([
-                'overview' => $overview
+                'advisor' => [
+                    'name' => $user->name,
+                    'total_advisees' => count($advisees)
+                ],
+                'advisees' => $advisees
             ]));
             return $response->withHeader('Content-Type', 'application/json');
         } catch (Exception $e) {
@@ -269,22 +346,22 @@ $app->group('/api/comparisons', function ($group) {
             return $response->withStatus(500)->withHeader('Content-Type', 'application/json');
         }
     });
-});
+})->add($container->get('jwt'));
 
 // Helper function to calculate percentiles
-function calculatePercentile($data, $percentile) {
-    if (empty($data)) return 0;
-    
-    sort($data);
-    $index = ($percentile / 100) * (count($data) - 1);
-    
+function calculatePercentile($values, $percentile)
+{
+    sort($values);
+    $count = count($values);
+    if ($count === 0) return 0;
+
+    $index = ($percentile / 100) * ($count - 1);
+
     if (floor($index) == $index) {
-        return $data[$index];
+        return $values[$index];
     } else {
-        $lower = $data[floor($index)];
-        $upper = $data[ceil($index)];
+        $lower = $values[floor($index)];
+        $upper = $values[ceil($index)];
         return $lower + ($upper - $lower) * ($index - floor($index));
     }
 }
-
-?>

@@ -71,8 +71,12 @@
                   <td>{{ enrolledStudents.length }}</td>
                 </tr>
                 <tr>
-                  <th>Assessments:</th>
-                  <td>{{ courseAssessments.length }}</td>
+                  <th>Students with Marks:</th>
+                  <td>{{ studentsWithMarks }}</td>
+                </tr>
+                <tr>
+                  <th>Class Average:</th>
+                  <td>{{ courseBreakdown.class_average || 'N/A' }}%</td>
                 </tr>
               </tbody>
             </table>
@@ -87,77 +91,133 @@
       <div class="col-md-8 mb-4">
         <div class="card h-100">
           <div class="card-header bg-light d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Assessment Breakdown</h5>
-            <button class="btn btn-sm btn-primary" @click="navigateToCreateAssessment">
-              <i class="fas fa-plus-circle me-2"></i> Add Assessment
-            </button>
+            <h5 class="mb-0">Component Breakdown</h5>
+            <router-link :to="`/lecturer/breakdown/${courseId}`" class="btn btn-sm btn-primary">
+              <i class="fas fa-chart-bar me-2"></i> View Detailed Analytics
+            </router-link>
           </div>
           <div class="card-body">
-            <div v-if="courseAssessments.length === 0" class="text-center py-4">
-              <p class="mb-3">No assessments have been added to this course yet.</p>
-              <button class="btn btn-primary" @click="navigateToCreateAssessment">
-                <i class="fas fa-plus-circle me-2"></i> Create First Assessment
-              </button>
+            <div v-if="isLoadingBreakdown" class="text-center py-4">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading component data...</span>
+              </div>
             </div>
             <div v-else>
+              <!-- Component Weightage Progress Bar -->
               <div class="mb-4">
                 <div class="progress" style="height: 30px;">
-                  <div v-for="assessment in courseAssessments" 
-                       :key="assessment.id"
-                       class="progress-bar" 
-                       :class="getAssessmentTypeClass(assessment.type)"
-                       :style="`width: ${assessment.weightage}%`"
-                       :title="`${assessment.name} (${assessment.weightage}%)`">
-                    {{ assessment.weightage }}%
+                  <div class="progress-bar bg-success" 
+                       style="width: 25%"
+                       title="Assignment (25%)">
+                    Assignment 25%
+                  </div>
+                  <div class="progress-bar bg-info" 
+                       style="width: 20%"
+                       title="Quiz (20%)">
+                    Quiz 20%
+                  </div>
+                  <div class="progress-bar bg-warning" 
+                       style="width: 25%"
+                       title="Test (25%)">
+                    Test 25%
+                  </div>
+                  <div class="progress-bar bg-danger" 
+                       style="width: 30%"
+                       title="Final Exam (30%)">
+                    Final Exam 30%
                   </div>
                 </div>
               </div>
-              <div class="table-responsive">
-                <table class="table table-hover">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Type</th>
-                      <th>Weight</th>
-                      <th>Due Date</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="assessment in courseAssessments" :key="assessment.id">
-                      <td>
-                        <strong>{{ assessment.name }}</strong>
-                        <div class="small text-muted">{{ assessment.description }}</div>
-                      </td>
-                      <td>
-                        <span class="badge" :class="getAssessmentTypeBadgeClass(assessment.type)">
-                          {{ assessment.type }}
-                        </span>
-                      </td>
-                      <td>{{ assessment.weightage }}%</td>
-                      <td>{{ formatDate(assessment.due_date) }}</td>
-                      <td>
-                        <span class="badge" :class="getAssessmentStatusBadgeClass(assessment)">
-                          {{ getAssessmentStatus(assessment) }}
-                        </span>
-                      </td>
-                      <td>
-                        <div class="btn-group btn-group-sm">
-                          <button class="btn btn-outline-primary" @click="navigateToEnterMarks(assessment)">
-                            <i class="fas fa-calculator"></i>
-                          </button>
-                          <button class="btn btn-outline-secondary" @click="navigateToEditAssessment(assessment)">
-                            <i class="fas fa-edit"></i>
-                          </button>
-                          <button class="btn btn-outline-danger" @click="confirmDeleteAssessment(assessment)">
-                            <i class="fas fa-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+              
+              <!-- Component Statistics -->
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <div class="card border-light">
+                    <div class="card-body p-3">
+                      <h6 class="card-title text-success">
+                        <i class="fas fa-file-alt me-2"></i>Assignment (25%)
+                      </h6>
+                      <div class="d-flex justify-content-between">
+                        <span>Class Average:</span>
+                        <strong>{{ courseBreakdown.assignment?.average || 'N/A' }}%</strong>
+                      </div>
+                      <div class="d-flex justify-content-between">
+                        <span>Highest Score:</span>
+                        <strong>{{ courseBreakdown.assignment?.highest || 'N/A' }}%</strong>
+                      </div>
+                      <div class="d-flex justify-content-between">
+                        <span>Students Completed:</span>
+                        <strong>{{ courseBreakdown.assignment?.completed || 0 }}/{{ enrolledStudents.length }}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                  <div class="card border-light">
+                    <div class="card-body p-3">
+                      <h6 class="card-title text-info">
+                        <i class="fas fa-question-circle me-2"></i>Quiz (20%)
+                      </h6>
+                      <div class="d-flex justify-content-between">
+                        <span>Class Average:</span>
+                        <strong>{{ courseBreakdown.quiz?.average || 'N/A' }}%</strong>
+                      </div>
+                      <div class="d-flex justify-content-between">
+                        <span>Highest Score:</span>
+                        <strong>{{ courseBreakdown.quiz?.highest || 'N/A' }}%</strong>
+                      </div>
+                      <div class="d-flex justify-content-between">
+                        <span>Students Completed:</span>
+                        <strong>{{ courseBreakdown.quiz?.completed || 0 }}/{{ enrolledStudents.length }}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                  <div class="card border-light">
+                    <div class="card-body p-3">
+                      <h6 class="card-title text-warning">
+                        <i class="fas fa-clipboard-check me-2"></i>Test (25%)
+                      </h6>
+                      <div class="d-flex justify-content-between">
+                        <span>Class Average:</span>
+                        <strong>{{ courseBreakdown.test?.average || 'N/A' }}%</strong>
+                      </div>
+                      <div class="d-flex justify-content-between">
+                        <span>Highest Score:</span>
+                        <strong>{{ courseBreakdown.test?.highest || 'N/A' }}%</strong>
+                      </div>
+                      <div class="d-flex justify-content-between">
+                        <span>Students Completed:</span>
+                        <strong>{{ courseBreakdown.test?.completed || 0 }}/{{ enrolledStudents.length }}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                  <div class="card border-light">
+                    <div class="card-body p-3">
+                      <h6 class="card-title text-danger">
+                        <i class="fas fa-graduation-cap me-2"></i>Final Exam (30%)
+                      </h6>
+                      <div class="d-flex justify-content-between">
+                        <span>Class Average:</span>
+                        <strong>{{ courseBreakdown.final_exam?.average || 'N/A' }}%</strong>
+                      </div>
+                      <div class="d-flex justify-content-between">
+                        <span>Highest Score:</span>
+                        <strong>{{ courseBreakdown.final_exam?.highest || 'N/A' }}%</strong>
+                      </div>
+                      <div class="d-flex justify-content-between">
+                        <span>Students Completed:</span>
+                        <strong>{{ courseBreakdown.final_exam?.completed || 0 }}/{{ enrolledStudents.length }}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -208,18 +268,18 @@
                         <div 
                           class="progress-bar bg-success" 
                           role="progressbar"
-                          :style="`width: ${getStudentProgress(student.id)}%`"
-                          :aria-valuenow="getStudentProgress(student.id)" 
+                          :style="`width: ${getStudentCompletionProgress(student.id)}%`"
+                          :aria-valuenow="getStudentCompletionProgress(student.id)" 
                           aria-valuemin="0" 
                           aria-valuemax="100">
-                          {{ getStudentProgress(student.id) }}%
+                          {{ getStudentCompletionProgress(student.id) }}%
                         </div>
                       </div>
                     </td>
                     <td>
                       <span 
-                        :class="getMarkClass(getStudentCurrentMark(student.id))">
-                        {{ getStudentCurrentMark(student.id) }}
+                        :class="getMarkClass(getStudentFinalGrade(student.id))">
+                        {{ getStudentFinalGrade(student.id) }}
                       </span>
                     </td>
                     <td>
@@ -259,30 +319,11 @@
         </div>
       </div>
     </div>
-
-    <!-- Delete Assessment Confirmation Modal -->
-    <div class="modal fade" id="deleteAssessmentModal" tabindex="-1" aria-labelledby="deleteAssessmentModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="deleteAssessmentModalLabel">Confirm Deletion</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            Are you sure you want to delete the assessment "{{ assessmentToDelete?.name }}"? This action cannot be undone.
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-danger" @click="deleteAssessment">Delete</button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script>
-import { mapState, mapGetters, mapActions } from 'vuex'
+import { mapState, mapActions } from 'vuex'
 
 export default {
   name: 'CourseDetail',
@@ -290,7 +331,9 @@ export default {
     return {
       courseId: null,
       studentSearchQuery: '',
-      assessmentToDelete: null,
+      isLoadingBreakdown: false,
+      courseBreakdown: {},
+      studentsMarks: [],
       editFormData: {
         code: '',
         name: '',
@@ -305,15 +348,17 @@ export default {
       isLoading: state => state.loading,
       course: state => state.courses.course,
     }),
-    ...mapGetters({
-      getCourseAssessments: 'assessments/getCourseAssessments'
-    }),
-    courseAssessments() {
-      return this.getCourseAssessments(this.courseId) || [];
-    },
     enrolledStudents() {
       // This would be populated from a store getter once implemented
       return this.$store.state.users.courseStudents || [];
+    },
+    studentsWithMarks() {
+      return this.studentsMarks.filter(student => 
+        student.assignment_mark !== null || 
+        student.quiz_mark !== null || 
+        student.test_mark !== null || 
+        student.final_exam_mark !== null
+      ).length;
     },
     filteredStudents() {
       if (!this.studentSearchQuery) {
@@ -334,14 +379,14 @@ export default {
       // Fetch course details
       await this.fetchCourse(this.courseId);
       
-      // Fetch course assessments
-      await this.fetchAssessments({ courseId: this.courseId });
-      
       // Fetch enrolled students
       await this.fetchCourseStudents(this.courseId);
       
-      // Fetch marks for this course
-      await this.fetchMarks({ courseId: this.courseId });
+      // Fetch component breakdown data
+      await this.fetchCourseBreakdown();
+      
+      // Fetch students marks from final_marks_custom
+      await this.fetchStudentsMarks();
       
       // Initialize edit form data
       this.initializeEditForm();
@@ -352,131 +397,130 @@ export default {
   methods: {
     ...mapActions({
       fetchCourse: 'courses/fetchCourse',
-      fetchAssessments: 'assessments/fetchAssessments',
-      fetchMarks: 'marks/fetchMarks',
-      updateCourse: 'courses/updateCourse',
-      deleteAssessmentAction: 'assessments/deleteAssessment'
+      updateCourse: 'courses/updateCourse'
     }),
     async fetchCourseStudents(courseId) {
       try {
-        // This action would need to be implemented in the users store module
-        await this.$store.dispatch('users/fetchCourseStudents', courseId);
+        const response = await fetch(`http://localhost:8080/marks-api.php?action=course_students_list&course_id=${courseId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          // Store in Vuex or local data
+          this.$store.commit('users/setCourseStudents', data.students || []);
+        } else {
+          console.error('Failed to fetch course students:', data.message);
+        }
       } catch (error) {
         console.error('Error fetching course students:', error);
+      }
+    },
+    async fetchCourseBreakdown() {
+      try {
+        this.isLoadingBreakdown = true;
+        const response = await fetch(`http://localhost:8080/breakdown-api.php?action=course_breakdown&course_id=${this.courseId}`);
+        const data = await response.json();
+        
+        // Check if the response has an error property (API error response)
+        if (data.error) {
+          console.error('Failed to fetch course breakdown:', data.error);
+        } else {
+          // The API returns data directly, not wrapped in a data property
+          // Create component breakdown from the response
+          const componentBreakdown = {};
+          if (data.component_breakdown) {
+            data.component_breakdown.forEach(comp => {
+              componentBreakdown[comp.type] = {
+                average: Math.round(comp.average_percentage || 0),
+                highest: Math.round(comp.average_percentage || 0), // Using average as highest for now
+                completed: comp.submissions || 0
+              };
+            });
+          }
+          
+          // Calculate highest scores from student data
+          if (data.students) {
+            data.students.forEach(student => {
+              if (student.marks) {
+                Object.keys(student.marks).forEach(type => {
+                  if (componentBreakdown[type]) {
+                    const percentage = parseFloat(student.marks[type].percentage || 0);
+                    if (percentage > componentBreakdown[type].highest) {
+                      componentBreakdown[type].highest = Math.round(percentage);
+                    }
+                  }
+                });
+              }
+            });
+          }
+          
+          this.courseBreakdown = {
+            ...componentBreakdown,
+            class_average: Math.round(data.statistics?.class_average || 0)
+          };
+        }
+      } catch (error) {
+        console.error('Error fetching course breakdown:', error);
+      } finally {
+        this.isLoadingBreakdown = false;
+      }
+    },
+    async fetchStudentsMarks() {
+      try {
+        const response = await fetch(`http://localhost:8080/marks-api.php?action=course_students_with_marks&course_id=${this.courseId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          this.studentsMarks = data.students || [];
+        } else {
+          console.error('Failed to fetch students marks:', data.message);
+        }
+      } catch (error) {
+        console.error('Error fetching students marks:', error);
       }
     },
     formatDate(dateString) {
       if (!dateString) return 'Not set';
       return new Date(dateString).toLocaleDateString();
     },
-    getAssessmentTypeClass(type) {
-      const types = {
-        'exam': 'bg-danger',
-        'midterm': 'bg-warning',
-        'quiz': 'bg-info',
-        'assignment': 'bg-success',
-        'project': 'bg-primary',
-        'lab': 'bg-secondary'
-      };
-      return types[type.toLowerCase()] || 'bg-secondary';
+    getStudentCompletionProgress(studentId) {
+      // Calculate completion progress based on how many components the student has completed
+      const studentData = this.studentsMarks.find(s => s.id === studentId);
+      if (!studentData) return 0;
+      
+      let completedComponents = 0;
+      if (studentData.assignment_mark !== null) completedComponents++;
+      if (studentData.quiz_mark !== null) completedComponents++;
+      if (studentData.test_mark !== null) completedComponents++;
+      if (studentData.final_exam_mark !== null) completedComponents++;
+      
+      return Math.round((completedComponents / 4) * 100);
     },
-    getAssessmentTypeBadgeClass(type) {
-      const types = {
-        'exam': 'bg-danger',
-        'midterm': 'bg-warning',
-        'quiz': 'bg-info',
-        'assignment': 'bg-success',
-        'project': 'bg-primary',
-        'lab': 'bg-secondary'
-      };
-      return types[type.toLowerCase()] || 'bg-secondary';
-    },
-    getAssessmentStatus(assessment) {
-      const today = new Date();
-      const dueDate = new Date(assessment.due_date);
+    getStudentFinalGrade(studentId) {
+      // Get final grade from final_marks_custom data
+      const studentData = this.studentsMarks.find(s => s.id === studentId);
+      if (!studentData) return 'N/A';
       
-      if (assessment.marks_entered) {
-        return 'Marked';
-      } else if (dueDate < today) {
-        return 'Overdue';
-      } else if (dueDate.getTime() - today.getTime() < 7 * 24 * 60 * 60 * 1000) {
-        return 'Upcoming';
-      } else {
-        return 'Scheduled';
-      }
-    },
-    getAssessmentStatusBadgeClass(assessment) {
-      const status = this.getAssessmentStatus(assessment);
-      const classes = {
-        'Marked': 'bg-success',
-        'Overdue': 'bg-danger',
-        'Upcoming': 'bg-warning',
-        'Scheduled': 'bg-info'
-      };
-      return classes[status] || 'bg-secondary';
-    },
-    getStudentProgress(studentId) {
-      // Calculate what percentage of assessments the student has completed
-      const studentMarks = this.$store.state.marks.marks.filter(mark => 
-        mark.student_id === studentId && mark.course_id === parseInt(this.courseId)
-      );
-      
-      if (this.courseAssessments.length === 0) return 0;
-      
-      return Math.round((studentMarks.length / this.courseAssessments.length) * 100);
-    },
-    getStudentCurrentMark(studentId) {
-      // Calculate the current weighted average for this student
-      const studentMarks = this.$store.state.marks.marks.filter(mark => 
-        mark.student_id === studentId && mark.course_id === parseInt(this.courseId)
-      );
-      
-      if (studentMarks.length === 0) return 'N/A';
-      
-      let weightedSum = 0;
-      let totalWeight = 0;
-      
-      studentMarks.forEach(mark => {
-        const assessment = this.courseAssessments.find(a => a.id === mark.assessment_id);
-        if (assessment) {
-          weightedSum += (mark.mark / assessment.max_mark) * assessment.weightage;
-          totalWeight += assessment.weightage;
-        }
-      });
-      
-      if (totalWeight === 0) return 'N/A';
-      
-      const averageMark = Math.round((weightedSum / totalWeight) * 100);
-      return `${averageMark}%`;
+      return studentData.final_grade || 'N/A';
     },
     getMarkClass(markString) {
       if (markString === 'N/A') return 'text-muted';
       
+      // Handle grade strings (A+, A, B+, etc.)
+      if (typeof markString === 'string' && markString.match(/^[A-F][+-]?$/)) {
+        const gradeOrder = ['F', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+'];
+        const gradeIndex = gradeOrder.indexOf(markString);
+        if (gradeIndex >= 8) return 'text-success fw-bold'; // B+ and above
+        if (gradeIndex >= 4) return 'text-warning'; // C and above
+        return 'text-danger'; // Below C
+      }
+      
+      // Handle percentage strings
       const mark = parseInt(markString);
       if (isNaN(mark)) return 'text-muted';
       
       if (mark >= 70) return 'text-success fw-bold';
       if (mark >= 50) return 'text-warning';
       return 'text-danger';
-    },
-    navigateToCreateAssessment() {
-      this.$router.push({ 
-        name: 'CreateAssessment',
-        query: { courseId: this.courseId }
-      });
-    },
-    navigateToEditAssessment(assessment) {
-      this.$router.push({ 
-        name: 'EditAssessment', 
-        params: { id: assessment.id }
-      });
-    },
-    navigateToEnterMarks(assessment) {
-      // This route would need to be added to the router
-      this.$router.push({ 
-        name: 'EnterMarks', 
-        params: { id: assessment.id }
-      });
     },
     navigateToStudentDetail(student) {
       this.$router.push({ 
@@ -486,10 +530,10 @@ export default {
       });
     },
     navigateToStudentMarks(student) {
-      // This route would need to be added to the router
+      // Navigate to marks management for specific student
       this.$router.push({ 
-        name: 'StudentMarks', 
-        params: { studentId: student.id, courseId: this.courseId }
+        path: `/lecturer/course/${this.courseId}/marks`,
+        query: { studentId: student.id }
       });
     },
     openEditCourseModal() {
@@ -522,27 +566,6 @@ export default {
         });
       } catch (error) {
         console.error('Error updating course:', error);
-      }
-    },
-    confirmDeleteAssessment(assessment) {
-      this.assessmentToDelete = assessment;
-      // In a real implementation, we would use Bootstrap's modal methods
-      // $('#deleteAssessmentModal').modal('show');
-    },
-    async deleteAssessment() {
-      if (!this.assessmentToDelete) return;
-      
-      try {
-        await this.deleteAssessmentAction(this.assessmentToDelete.id);
-        // Close modal
-        // $('#deleteAssessmentModal').modal('hide');
-        this.$store.dispatch('showToast', {
-          message: 'Assessment deleted successfully',
-          type: 'success'
-        });
-        this.assessmentToDelete = null;
-      } catch (error) {
-        console.error('Error deleting assessment:', error);
       }
     },
     exportCourseData() {

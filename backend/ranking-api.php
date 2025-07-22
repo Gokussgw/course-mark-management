@@ -112,33 +112,25 @@ function getStudentRanking($pdo, $user)
             return;
         }
 
-        // Calculate overall ranking based on GPA
+        // Calculate overall ranking based on GPA from final_marks_custom
         $stmt = $pdo->prepare("
             WITH student_performance AS (
                 SELECT 
                     u.id,
                     u.name,
                     u.matric_number,
-                    COALESCE(AVG(
-                        CASE 
-                            WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                            ELSE 0 
-                        END
-                    ), 0) as gpa,
-                    COUNT(DISTINCT c.id) as courses_taken,
-                    COUNT(DISTINCT m.id) as assessments_completed
+                    COALESCE(AVG(fm.gpa), 0) as gpa,
+                    COUNT(DISTINCT fm.course_id) as courses_taken,
+                    AVG(fm.final_grade) as average_grade
                 FROM users u
-                LEFT JOIN enrollments e ON u.id = e.student_id
-                LEFT JOIN courses c ON e.course_id = c.id
-                LEFT JOIN assessments a ON c.id = a.course_id
-                LEFT JOIN marks m ON u.id = m.student_id AND a.id = m.assessment_id
+                LEFT JOIN final_marks_custom fm ON u.id = fm.student_id
                 WHERE u.role = 'student'
                 GROUP BY u.id, u.name, u.matric_number
             ),
             ranked_students AS (
                 SELECT 
                     *,
-                    RANK() OVER (ORDER BY gpa DESC, assessments_completed DESC) as overall_rank,
+                    RANK() OVER (ORDER BY gpa DESC, average_grade DESC) as overall_rank,
                     COUNT(*) OVER() as total_students
                 FROM student_performance
             )
@@ -157,34 +149,28 @@ function getStudentRanking($pdo, $user)
             return;
         }
 
-        // Get course-specific rankings
+        // Get course-specific rankings from final_marks_custom
+        // Get course-specific rankings from final_marks_custom
         $courseStmt = $pdo->prepare("
             SELECT 
                 c.id as course_id,
                 c.code,
                 c.name as course_name,
-                AVG(
-                    CASE 
-                        WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                        ELSE 0 
-                    END
-                ) as course_average,
+                fm.final_grade as course_average,
+                fm.letter_grade,
+                fm.gpa as course_gpa,
+                fm.assignment_mark,
+                fm.quiz_mark,
+                fm.test_mark,
+                fm.final_exam_mark,
                 RANK() OVER (
                     PARTITION BY c.id 
-                    ORDER BY AVG(
-                        CASE 
-                            WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                            ELSE 0 
-                        END
-                    ) DESC
+                    ORDER BY fm.final_grade DESC
                 ) as course_rank,
-                COUNT(DISTINCT e.student_id) as students_in_course
+                COUNT(*) OVER (PARTITION BY c.id) as students_in_course
             FROM courses c
-            JOIN enrollments e ON c.id = e.course_id
-            JOIN assessments a ON c.id = a.course_id
-            JOIN marks m ON e.student_id = m.student_id AND a.id = m.assessment_id
-            WHERE e.student_id = ?
-            GROUP BY c.id, c.code, c.name
+            JOIN final_marks_custom fm ON c.id = fm.course_id
+            WHERE fm.student_id = ?
         ");
 
         $courseStmt->execute([$studentId]);
@@ -192,6 +178,7 @@ function getStudentRanking($pdo, $user)
 
         // Format the response
         $ranking['gpa'] = round($ranking['gpa'], 2);
+        $ranking['average_grade'] = round($ranking['average_grade'], 2);
         $ranking['course_rankings'] = array_map(function ($course) {
             $course['course_average'] = round($course['course_average'], 2);
             return $course;
@@ -223,26 +210,18 @@ function getClassRankings($pdo, $user)
                     u.id,
                     u.name,
                     u.matric_number,
-                    COALESCE(AVG(
-                        CASE 
-                            WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                            ELSE 0 
-                        END
-                    ), 0) as gpa,
-                    COUNT(DISTINCT c.id) as courses_taken,
-                    COUNT(DISTINCT m.id) as assessments_completed
+                    COALESCE(AVG(fm.gpa), 0) as gpa,
+                    COUNT(DISTINCT fm.course_id) as courses_taken,
+                    AVG(fm.final_grade) as average_grade
                 FROM users u
-                LEFT JOIN enrollments e ON u.id = e.student_id
-                LEFT JOIN courses c ON e.course_id = c.id
-                LEFT JOIN assessments a ON c.id = a.course_id
-                LEFT JOIN marks m ON u.id = m.student_id AND a.id = m.assessment_id
+                LEFT JOIN final_marks_custom fm ON u.id = fm.student_id
                 WHERE u.role = 'student'
                 GROUP BY u.id, u.name, u.matric_number
             ),
             ranked_students AS (
                 SELECT 
                     *,
-                    RANK() OVER (ORDER BY gpa DESC, assessments_completed DESC) as overall_rank,
+                    RANK() OVER (ORDER BY gpa DESC, average_grade DESC) as overall_rank,
                     COUNT(*) OVER() as total_students
                 FROM student_performance
             )
@@ -259,10 +238,10 @@ function getClassRankings($pdo, $user)
         // Format the data
         foreach ($rankings as &$student) {
             $student['gpa'] = round($student['gpa'], 2);
+            $student['average_grade'] = round($student['average_grade'], 2);
             $student['overall_rank'] = (int)$student['overall_rank'];
             $student['total_students'] = (int)$student['total_students'];
             $student['courses_taken'] = (int)$student['courses_taken'];
-            $student['assessments_completed'] = (int)$student['assessments_completed'];
         }
 
         echo json_encode(['rankings' => $rankings]);
@@ -298,25 +277,22 @@ function getCourseRankings($pdo, $user)
                     u.matric_number,
                     c.code,
                     c.name as course_name,
-                    AVG(
-                        CASE 
-                            WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                            ELSE 0 
-                        END
-                    ) as course_average,
-                    COUNT(DISTINCT m.id) as assessments_completed
+                    fm.final_grade as course_average,
+                    fm.letter_grade,
+                    fm.gpa as course_gpa,
+                    fm.assignment_mark,
+                    fm.quiz_mark,
+                    fm.test_mark,
+                    fm.final_exam_mark
                 FROM users u
-                JOIN enrollments e ON u.id = e.student_id
-                JOIN courses c ON e.course_id = c.id
-                JOIN assessments a ON c.id = a.course_id
-                LEFT JOIN marks m ON u.id = m.student_id AND a.id = m.assessment_id
+                JOIN final_marks_custom fm ON u.id = fm.student_id
+                JOIN courses c ON fm.course_id = c.id
                 WHERE c.id = ? AND u.role = 'student'
-                GROUP BY u.id, u.name, u.matric_number, c.code, c.name
             ),
             ranked_course_students AS (
                 SELECT 
                     *,
-                    RANK() OVER (ORDER BY course_average DESC, assessments_completed DESC) as course_rank,
+                    RANK() OVER (ORDER BY course_average DESC) as course_rank,
                     COUNT(*) OVER() as total_students_in_course
                 FROM course_performance
             )
@@ -332,9 +308,9 @@ function getCourseRankings($pdo, $user)
         // Format the data
         foreach ($rankings as &$student) {
             $student['course_average'] = round($student['course_average'], 2);
+            $student['course_gpa'] = round($student['course_gpa'], 2);
             $student['course_rank'] = (int)$student['course_rank'];
             $student['total_students_in_course'] = (int)$student['total_students_in_course'];
-            $student['assessments_completed'] = (int)$student['assessments_completed'];
         }
 
         echo json_encode(['rankings' => $rankings]);
@@ -362,43 +338,27 @@ function getAdvisorStudentsRankings($pdo, $user)
                     u.id,
                     u.name,
                     u.matric_number,
-                    COALESCE(AVG(
-                        CASE 
-                            WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                            ELSE 0 
-                        END
-                    ), 0) as gpa,
-                    COUNT(DISTINCT c.id) as courses_taken,
-                    COUNT(DISTINCT m.id) as assessments_completed
+                    COALESCE(AVG(fm.gpa), 0) as gpa,
+                    COUNT(DISTINCT fm.course_id) as courses_taken,
+                    AVG(fm.final_grade) as average_grade
                 FROM users u
-                LEFT JOIN enrollments e ON u.id = e.student_id
-                LEFT JOIN courses c ON e.course_id = c.id
-                LEFT JOIN assessments a ON c.id = a.course_id
-                LEFT JOIN marks m ON u.id = m.student_id AND a.id = m.assessment_id
+                LEFT JOIN final_marks_custom fm ON u.id = fm.student_id
                 WHERE u.advisor_id = ? AND u.role = 'student'
                 GROUP BY u.id, u.name, u.matric_number
             ),
             ranked_advisor_students AS (
                 SELECT 
                     *,
-                    RANK() OVER (ORDER BY gpa DESC, assessments_completed DESC) as advisor_rank,
+                    RANK() OVER (ORDER BY gpa DESC, average_grade DESC) as advisor_rank,
                     COUNT(*) OVER() as total_advisor_students
                 FROM advisor_student_performance
             ),
             overall_student_performance AS (
                 SELECT 
                     u.id,
-                    COALESCE(AVG(
-                        CASE 
-                            WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                            ELSE 0 
-                        END
-                    ), 0) as overall_gpa
+                    COALESCE(AVG(fm.gpa), 0) as overall_gpa
                 FROM users u
-                LEFT JOIN enrollments e ON u.id = e.student_id
-                LEFT JOIN courses c ON e.course_id = c.id
-                LEFT JOIN assessments a ON c.id = a.course_id
-                LEFT JOIN marks m ON u.id = m.student_id AND a.id = m.assessment_id
+                LEFT JOIN final_marks_custom fm ON u.id = fm.student_id
                 WHERE u.role = 'student'
                 GROUP BY u.id
             ),
@@ -424,12 +384,12 @@ function getAdvisorStudentsRankings($pdo, $user)
         // Format the data
         foreach ($rankings as &$student) {
             $student['gpa'] = round($student['gpa'], 2);
+            $student['average_grade'] = round($student['average_grade'], 2);
             $student['advisor_rank'] = (int)$student['advisor_rank'];
             $student['total_advisor_students'] = (int)$student['total_advisor_students'];
             $student['overall_rank'] = (int)$student['overall_rank'];
             $student['total_students'] = (int)$student['total_students'];
             $student['courses_taken'] = (int)$student['courses_taken'];
-            $student['assessments_completed'] = (int)$student['assessments_completed'];
         }
 
         echo json_encode(['rankings' => $rankings]);
