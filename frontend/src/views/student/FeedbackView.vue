@@ -215,7 +215,7 @@ export default {
           return;
         }
 
-        const response = await axios.get(`http://localhost:8080/feedback-api.php?action=student_feedback&student_id=${studentId}`);
+        const response = await axios.get(`http://localhost:3000/feedback-api.php?action=student_feedback&student_id=${studentId}`);
         this.feedbackList = response.data.feedback || [];
       } catch (error) {
         console.error('Error loading feedback:', error);

@@ -366,7 +366,7 @@ export default {
       
       try {
         const token = localStorage.getItem('token')
-        const response = await fetch(`http://localhost:8000/api/advisee-reports/individual/${this.studentId}`, {
+        const response = await fetch(`http://localhost:3000/api/advisee-reports/individual/${this.studentId}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -396,7 +396,7 @@ export default {
     async exportStudentReport() {
       try {
         const token = localStorage.getItem('token')
-        const response = await fetch(`http://localhost:8000/api/advisee-reports/export/csv?student_id=${this.studentId}`, {
+        const response = await fetch(`http://localhost:3000/api/advisee-reports/export/csv?student_id=${this.studentId}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`

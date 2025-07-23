@@ -351,7 +351,7 @@ export default {
         
         const lecturerId = this.userId;
         
-        const response = await fetch(`http://localhost:8080/marks-api.php?action=lecturer_courses&lecturer_id=${lecturerId}`, {
+        const response = await fetch(`http://localhost:3000/marks-api.php?action=lecturer_courses&lecturer_id=${lecturerId}`, {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -410,7 +410,7 @@ export default {
     async loadStudentsWithMarks() {
       try {
         // Make API call to get students with marks for this course
-        const response = await fetch(`http://localhost:8080/marks-api.php?action=course_students_marks&course_id=${this.courseId}`, {
+        const response = await fetch(`http://localhost:3000/marks-api.php?action=course_students_marks&course_id=${this.courseId}`, {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -523,7 +523,7 @@ export default {
           }
         };
 
-        const response = await fetch('http://localhost:8080/marks-api.php', {
+        const response = await fetch('http://localhost:3000/marks-api.php', {
           method: 'POST',
           credentials: 'include',
           headers: {

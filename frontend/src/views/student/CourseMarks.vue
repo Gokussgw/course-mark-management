@@ -525,7 +525,7 @@ export default {
         
         console.log('Request data:', requestData);
         
-        const response = await fetch('http://localhost:8000/api/marks/student_course_detail', {
+        const response = await fetch('http://localhost:3000/api/marks/student_course_detail', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

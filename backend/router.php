@@ -3,6 +3,41 @@
 $uri = $_SERVER['REQUEST_URI'];
 $path = parse_url($uri, PHP_URL_PATH);
 
+// Add CORS headers for all requests
+function addCORSHeaders()
+{
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    $allowedOrigins = [
+        'http://localhost:8080',
+        'http://localhost:8081',
+        'http://localhost:8082',
+        'http://localhost:8083',
+        'http://localhost:8084',
+        'http://localhost:3000'
+    ];
+
+    if (in_array($origin, $allowedOrigins) || preg_match('/^http:\/\/localhost:\d+$/', $origin)) {
+        header("Access-Control-Allow-Origin: $origin");
+    } else {
+        header("Access-Control-Allow-Origin: *");
+    }
+
+    header('Access-Control-Allow-Headers: X-Requested-With, Content-Type, Accept, Origin, Authorization, Cache-Control');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    header('Access-Control-Allow-Credentials: true');
+    header('Access-Control-Max-Age: 86400');
+}
+
+// Handle preflight OPTIONS requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    addCORSHeaders();
+    http_response_code(200);
+    exit;
+}
+
+// Add CORS headers to all responses
+addCORSHeaders();
+
 // Handle specific API files
 if ($path === '/db-api.php' && file_exists(__DIR__ . '/db-api.php')) {
     include __DIR__ . '/db-api.php';

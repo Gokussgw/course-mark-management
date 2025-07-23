@@ -372,7 +372,7 @@ export default {
       
       try {
         const token = localStorage.getItem('token')
-        const response = await fetch('http://localhost:8000/api/advisee-reports/comprehensive', {
+        const response = await fetch('http://localhost:3000/api/advisee-reports/comprehensive', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -402,7 +402,7 @@ export default {
     async exportToCSV() {
       try {
         const token = localStorage.getItem('token')
-        const response = await fetch('http://localhost:8000/api/advisee-reports/export/csv', {
+        const response = await fetch('http://localhost:3000/api/advisee-reports/export/csv', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`

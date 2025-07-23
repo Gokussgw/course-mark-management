@@ -401,7 +401,7 @@ export default {
     }),
     async fetchCourseStudents(courseId) {
       try {
-        const response = await fetch(`http://localhost:8080/marks-api.php?action=course_students_list&course_id=${courseId}`);
+        const response = await fetch(`http://localhost:3000/marks-api.php?action=course_students_list&course_id=${courseId}`);
         const data = await response.json();
         
         if (data.success) {
@@ -417,7 +417,7 @@ export default {
     async fetchCourseBreakdown() {
       try {
         this.isLoadingBreakdown = true;
-        const response = await fetch(`http://localhost:8080/breakdown-api.php?action=course_breakdown&course_id=${this.courseId}`);
+        const response = await fetch(`http://localhost:3000/breakdown-api.php?action=course_breakdown&course_id=${this.courseId}`);
         const data = await response.json();
         
         // Check if the response has an error property (API error response)
@@ -466,7 +466,7 @@ export default {
     },
     async fetchStudentsMarks() {
       try {
-        const response = await fetch(`http://localhost:8080/marks-api.php?action=course_students_with_marks&course_id=${this.courseId}`);
+        const response = await fetch(`http://localhost:3000/marks-api.php?action=course_students_with_marks&course_id=${this.courseId}`);
         const data = await response.json();
         
         if (data.success) {

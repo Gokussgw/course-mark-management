@@ -119,18 +119,27 @@ $app->add(function ($request, $handler) {
     $response = $handler->handle($request);
     $origin = $request->getHeaderLine('Origin');
 
-    // Allow any localhost port
-    if (preg_match('/^http:\/\/localhost:\d+$/', $origin)) {
+    // Allow specific localhost ports including 8084
+    $allowedOrigins = [
+        'http://localhost:8080',
+        'http://localhost:8081',
+        'http://localhost:8082',
+        'http://localhost:8083',
+        'http://localhost:8084',
+        'http://localhost:3000'
+    ];
+
+    $allowedOrigin = '*'; // Default fallback
+    if (in_array($origin, $allowedOrigins) || preg_match('/^http:\/\/localhost:\d+$/', $origin)) {
         $allowedOrigin = $origin;
-    } else {
-        $allowedOrigin = 'http://localhost:3000'; // fallback
     }
 
     return $response
         ->withHeader('Access-Control-Allow-Origin', $allowedOrigin)
-        ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
+        ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization, Cache-Control')
         ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
-        ->withHeader('Access-Control-Allow-Credentials', 'true');
+        ->withHeader('Access-Control-Allow-Credentials', 'true')
+        ->withHeader('Access-Control-Max-Age', '86400'); // Cache preflight for 1 day
 });
 
 // Add error middleware
@@ -143,18 +152,28 @@ $app->addBodyParsingMiddleware();
 $app->options('/{routes:.+}', function (Request $request, Response $response) {
     $origin = $request->getHeaderLine('Origin');
 
-    // Allow any localhost port
-    if (preg_match('/^http:\/\/localhost:\d+$/', $origin)) {
+    // Allow specific localhost ports including 8084
+    $allowedOrigins = [
+        'http://localhost:8080',
+        'http://localhost:8081',
+        'http://localhost:8082',
+        'http://localhost:8083',
+        'http://localhost:8084',
+        'http://localhost:3000'
+    ];
+
+    $allowedOrigin = '*'; // Default fallback
+    if (in_array($origin, $allowedOrigins) || preg_match('/^http:\/\/localhost:\d+$/', $origin)) {
         $allowedOrigin = $origin;
-    } else {
-        $allowedOrigin = 'http://localhost:3000'; // fallback
     }
 
     return $response
         ->withHeader('Access-Control-Allow-Origin', $allowedOrigin)
-        ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
+        ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization, Cache-Control')
         ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
-        ->withHeader('Access-Control-Allow-Credentials', 'true');
+        ->withHeader('Access-Control-Allow-Credentials', 'true')
+        ->withHeader('Access-Control-Max-Age', '86400') // Cache preflight for 1 day
+        ->withStatus(200);
 });
 
 // Define routes
@@ -178,7 +197,6 @@ require __DIR__ . '/src/routes/admin.php';
 require __DIR__ . '/src/routes/system.php';
 require __DIR__ . '/src/routes/comparisons.php';
 require __DIR__ . '/src/routes/adviseeReports.php';
-require __DIR__ . '/src/routes/debug.php';
 
 // Catch-all route to handle 404 errors
 $app->map(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], '/{routes:.+}', function ($request, $response) {

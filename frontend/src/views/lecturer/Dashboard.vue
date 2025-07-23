@@ -541,7 +541,7 @@ export default {
       
       for (const course of this.courses) {
         try {
-          const response = await fetch(`http://localhost:8080/breakdown-api.php?action=course_breakdown&course_id=${course.id}`);
+          const response = await fetch(`http://localhost:3000/breakdown-api.php?action=course_breakdown&course_id=${course.id}`);
           const data = await response.json();
           
           if (!data.error && data.component_breakdown) {
@@ -572,7 +572,7 @@ export default {
       
       for (const course of this.courses) {
         try {
-          const response = await fetch(`http://localhost:8080/marks-api.php?action=course_students_with_marks&course_id=${course.id}`);
+          const response = await fetch(`http://localhost:3000/marks-api.php?action=course_students_with_marks&course_id=${course.id}`);
           const data = await response.json();
           
           if (data.success && data.students) {
@@ -866,7 +866,7 @@ export default {
     
     async sendNotification() {
       try {
-        const response = await fetch('http://localhost:8080/marks-api.php', {
+        const response = await fetch('http://localhost:3000/marks-api.php', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -934,7 +934,7 @@ export default {
 
     async loadUnreadCount() {
       try {
-        const response = await fetch(`http://localhost:8080/marks-api.php?action=unread_notifications&user_id=${this.getUser.id}`, {
+        const response = await fetch(`http://localhost:3000/marks-api.php?action=unread_notifications&user_id=${this.getUser.id}`, {
           credentials: 'include'
         });
         const data = await response.json();

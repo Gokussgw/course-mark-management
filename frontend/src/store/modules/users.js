@@ -258,7 +258,7 @@ export default {
         
         // Use the advisor dashboard API to get advisee data
         const token = localStorage.getItem('token');
-        const response = await axios.get(`http://localhost:8080/advisor-dashboard-api.php?action=advisees`, {
+        const response = await axios.get(`http://localhost:3000/advisor-dashboard-api.php?action=advisees`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

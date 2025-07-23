@@ -300,13 +300,13 @@ export default {
         
         // Fetch all dashboard data in parallel
         const [coursesResponse, assessmentsResponse, performanceResponse] = await Promise.all([
-          fetch(`http://localhost:8000/marks-api.php?action=student_dashboard_courses&student_id=${studentId}`, {
+          fetch(`http://localhost:3000/marks-api.php?action=student_dashboard_courses&student_id=${studentId}`, {
             credentials: 'include'
           }),
-          fetch(`http://localhost:8000/marks-api.php?action=student_dashboard_assessments&student_id=${studentId}`, {
+          fetch(`http://localhost:3000/marks-api.php?action=student_dashboard_assessments&student_id=${studentId}`, {
             credentials: 'include'
           }),
-          fetch(`http://localhost:8000/marks-api.php?action=student_dashboard_performance&student_id=${studentId}`, {
+          fetch(`http://localhost:3000/marks-api.php?action=student_dashboard_performance&student_id=${studentId}`, {
             credentials: 'include'
           })
         ]);

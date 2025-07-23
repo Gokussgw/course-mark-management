@@ -581,7 +581,7 @@ export default {
         }
 
         const response = await fetch(
-          `http://localhost:8000/api/advisee-reports/comprehensive`,
+          `http://localhost:3000/api/advisee-reports/comprehensive`,
           {
             method: "GET",
             headers: {
@@ -637,7 +637,7 @@ export default {
         }
 
         const response = await fetch(
-          `http://localhost:8080/advisor-dashboard-api.php?action=notes`,
+          `http://localhost:3000/advisor-dashboard-api.php?action=notes`,
           {
             method: "GET",
             headers: {
@@ -668,7 +668,7 @@ export default {
         if (!userId) return;
 
         const response = await fetch(
-          `http://localhost:8080/breakdown-api.php?action=advisor_courses&advisor_id=${userId}`,
+          `http://localhost:3000/breakdown-api.php?action=advisor_courses&advisor_id=${userId}`,
           {
             method: "GET",
             credentials: "include",
@@ -723,7 +723,7 @@ export default {
         }
 
         const response = await fetch(
-          `http://localhost:8080/ranking-api.php?action=advisor_students_rankings`,
+          `http://localhost:3000/ranking-api.php?action=advisor_students_rankings`,
           {
             method: "GET",
             headers: {
@@ -866,7 +866,7 @@ export default {
         }
 
         const response = await fetch(
-          `http://localhost:8080/advisor-dashboard-api.php?action=notes`,
+          `http://localhost:3000/advisor-dashboard-api.php?action=notes`,
           {
             method: "POST",
             headers: {
@@ -923,7 +923,7 @@ export default {
           }
 
           const response = await fetch(
-            `http://localhost:8080/advisor-dashboard-api.php?action=notes&note_id=${note.id}`,
+            `http://localhost:3000/advisor-dashboard-api.php?action=notes&note_id=${note.id}`,
             {
               method: "DELETE",
               headers: {

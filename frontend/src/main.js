@@ -7,7 +7,7 @@ import 'bootstrap'
 import 'bootstrap/dist/css/bootstrap.min.css'
 
 // Set default axios settings
-axios.defaults.baseURL = process.env.VUE_APP_API_URL || 'http://localhost:8080';
+axios.defaults.baseURL = process.env.VUE_APP_API_URL || 'http://localhost:3000';
 
 // Add token to requests if available
 axios.interceptors.request.use(config => {

@@ -2,7 +2,7 @@
 export default {
   async getUnreadCount(userId) {
     try {
-      const response = await fetch(`http://localhost:8000/marks-api.php?action=unread_notifications&user_id=${userId}`, {
+      const response = await fetch(`http://localhost:3000/marks-api.php?action=unread_notifications&user_id=${userId}`, {
         credentials: 'include'
       });
       const data = await response.json();
@@ -15,7 +15,7 @@ export default {
 
   async getRecentNotifications(userId, limit = 10) {
     try {
-      const response = await fetch(`http://localhost:8000/marks-api.php?action=recent_notifications&user_id=${userId}&limit=${limit}`, {
+      const response = await fetch(`http://localhost:3000/marks-api.php?action=recent_notifications&user_id=${userId}&limit=${limit}`, {
         credentials: 'include'
       });
       const data = await response.json();
@@ -28,7 +28,7 @@ export default {
 
   async sendCourseAnnouncement(courseId, lecturerId, title, message, includeMarks = false) {
     try {
-      const response = await fetch('http://localhost:8000/marks-api.php', {
+      const response = await fetch('http://localhost:3000/marks-api.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -54,7 +54,7 @@ export default {
 
   async markAsRead(notificationId) {
     try {
-      const response = await fetch('http://localhost:8000/marks-api.php', {
+      const response = await fetch('http://localhost:3000/marks-api.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

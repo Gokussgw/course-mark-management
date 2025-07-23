@@ -220,7 +220,7 @@ export default {
         }
 
         const response = await fetch(
-          `http://localhost:8000/ranking-api.php?action=student_ranking&student_id=${this.targetStudentId}`,
+          `http://localhost:3000/ranking-api.php?action=student_ranking&student_id=${this.targetStudentId}`,
           {
             method: 'GET',
             headers: {
@@ -255,7 +255,7 @@ export default {
 
         const offset = (this.currentPage - 1) * this.pageSize
         const response = await fetch(
-          `http://localhost:8000/ranking-api.php?action=class_rankings&limit=${this.pageSize}&offset=${offset}`,
+          `http://localhost:3000/ranking-api.php?action=class_rankings&limit=${this.pageSize}&offset=${offset}`,
           {
             method: 'GET',
             headers: {

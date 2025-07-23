@@ -1,10 +1,11 @@
 import axios from 'axios'
+import localStorage_utils from '@/utils/localStorage'
 
 export default {
   namespaced: true,
   state: {
     token: localStorage.getItem('token') || null,
-    user: JSON.parse(localStorage.getItem('user')) || null
+    user: localStorage_utils.getJSON('user', null)
   },
   getters: {
     isAuthenticated: state => !!state.token,
@@ -31,7 +32,7 @@ export default {
         dispatch('setLoading', true, { root: true });
         
         // Use the proper auth endpoint with correct backend port
-        const response = await axios.post('http://localhost:8000/api/auth/login', {
+        const response = await axios.post('http://localhost:3000/api/auth/login', {
           email: credentials.email,
           password: credentials.password
         });
@@ -44,7 +45,7 @@ export default {
         
         // Save to localStorage
         localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
+        localStorage_utils.setJSON('user', user);
         
         console.log('Saved to localStorage - token:', localStorage.getItem('token')); // Debug log
         console.log('Saved to localStorage - user:', localStorage.getItem('user')); // Debug log
@@ -68,7 +69,7 @@ export default {
     async register({ dispatch }, userData) {
       try {
         dispatch('setLoading', true, { root: true });
-        const response = await axios.post('http://localhost:8000/api/auth/register', userData);
+        const response = await axios.post('http://localhost:3000/api/auth/register', userData);
         return response.data;
       } catch (error) {
         const errorMsg = error.response?.data?.error || 'Registration failed';
@@ -100,19 +101,18 @@ export default {
       try {
         console.log('=== checkAuth called ==='); // Debug log
         const token = localStorage.getItem('token');
-        const userStr = localStorage.getItem('user');
+        const user = localStorage_utils.getJSON('user', null);
         
         console.log('Checking auth - token:', token);
-        console.log('Checking auth - user string:', userStr);
+        console.log('Checking auth - user:', user);
         
-        if (token && userStr) {
-          const user = JSON.parse(userStr);
-          console.log('Parsed user:', user);
+        if (token && user) {
+          console.log('Valid auth data found');
           commit('SET_TOKEN', token);
           commit('SET_USER', user);
           console.log('Auth state restored from localStorage'); // Debug log
         } else {
-          console.log('No auth data found in localStorage');
+          console.log('No valid auth data found in localStorage');
         }
       } catch (error) {
         console.error('Error checking auth:', error);

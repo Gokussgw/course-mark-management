@@ -394,14 +394,14 @@ export default {
 
         let endpoint = '';
         if (this.currentUserRole === 'lecturer') {
-          endpoint = `http://localhost:8080/marks-api.php?action=lecturer_courses&lecturer_id=${userId}`;
+          endpoint = `http://localhost:3000/marks-api.php?action=lecturer_courses&lecturer_id=${userId}`;
         } else if (this.currentUserRole === 'student') {
-          endpoint = `http://localhost:8080/breakdown-api.php?action=student_courses&student_id=${userId}`;
+          endpoint = `http://localhost:3000/breakdown-api.php?action=student_courses&student_id=${userId}`;
         } else if (this.currentUserRole === 'advisor') {
-          endpoint = `http://localhost:8080/breakdown-api.php?action=advisor_courses&advisor_id=${userId}`;
+          endpoint = `http://localhost:3000/breakdown-api.php?action=advisor_courses&advisor_id=${userId}`;
         } else {
           // Default to student courses for testing
-          endpoint = `http://localhost:8080/breakdown-api.php?action=student_courses&student_id=4`;
+          endpoint = `http://localhost:3000/breakdown-api.php?action=student_courses&student_id=4`;
         }
 
         console.log('API endpoint:', endpoint);
@@ -451,7 +451,7 @@ export default {
       this.isLoading = true;
       try {
         // Load students and marks for the course
-        const response = await axios.get(`http://localhost:8080/breakdown-api.php?action=course_breakdown&course_id=${this.selectedCourseId}`);
+        const response = await axios.get(`http://localhost:3000/breakdown-api.php?action=course_breakdown&course_id=${this.selectedCourseId}`);
         
         if (response.data && response.data.students) {
           // Map real data to component format
