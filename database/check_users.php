@@ -8,7 +8,8 @@ $dotenv = Dotenv::createImmutable('../backend');
 $dotenv->load();
 
 // Database connection
-function getDbConnection() {
+function getDbConnection()
+{
     $host = $_ENV['DB_HOST'] ?? 'localhost';
     $dbname = $_ENV['DB_NAME'] ?? 'course_mark_management';
     $username = $_ENV['DB_USER'] ?? 'root';
@@ -25,21 +26,19 @@ function getDbConnection() {
 
 try {
     $pdo = getDbConnection();
-    
+
     echo "Users table structure:\n";
     $stmt = $pdo->query('DESCRIBE users');
-    while($row = $stmt->fetch()) {
+    while ($row = $stmt->fetch()) {
         echo "- " . $row['Field'] . " (" . $row['Type'] . ")\n";
     }
-    
+
     echo "\nSample users with advisor role:\n";
     $stmt = $pdo->query('SELECT * FROM users WHERE role = "advisor" LIMIT 3');
-    while($row = $stmt->fetch()) {
+    while ($row = $stmt->fetch()) {
         print_r($row);
         echo "\n";
     }
-    
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";
 }
-?>

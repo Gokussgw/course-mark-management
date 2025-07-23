@@ -203,7 +203,7 @@ function getClassRankings($pdo, $user)
     try {
         $limit = intval($_GET['limit'] ?? 20);
         $offset = intval($_GET['offset'] ?? 0);
-        
+
         // Ensure positive values for security
         $limit = max(1, min(100, $limit));  // Between 1 and 100
         $offset = max(0, $offset);  // Non-negative

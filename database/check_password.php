@@ -20,10 +20,10 @@ try {
         echo "- Name: {$advisor['name']}\n";
         echo "- Email: {$advisor['email']}\n";
         echo "- Password hash: {$advisor['password']}\n\n";
-        
+
         // Test password verification
         $testPasswords = ['password123', 'password', 'admin', 'admin123'];
-        
+
         foreach ($testPasswords as $testPass) {
             if (password_verify($testPass, $advisor['password'])) {
                 echo "✅ Password '$testPass' is CORRECT!\n";
@@ -35,8 +35,6 @@ try {
     } else {
         echo "❌ Advisor account not found\n";
     }
-
 } catch (PDOException $e) {
     echo "❌ Database error: " . $e->getMessage() . "\n";
 }
-?>

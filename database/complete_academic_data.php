@@ -8,7 +8,8 @@ $dotenv = Dotenv::createImmutable('../backend');
 $dotenv->load();
 
 // Database connection
-function getDbConnection() {
+function getDbConnection()
+{
     $host = $_ENV['DB_HOST'] ?? 'localhost';
     $dbname = $_ENV['DB_NAME'] ?? 'course_mark_management';
     $username = $_ENV['DB_USER'] ?? 'root';
@@ -23,24 +24,39 @@ function getDbConnection() {
     }
 }
 
-function calculateGPA($letterGrade) {
+function calculateGPA($letterGrade)
+{
     switch ($letterGrade) {
-        case 'A+': case 'A': return 4.0;
-        case 'A-': return 3.7;
-        case 'B+': return 3.3;
-        case 'B': return 3.0;
-        case 'B-': return 2.7;
-        case 'C+': return 2.3;
-        case 'C': return 2.0;
-        case 'C-': return 1.7;
-        case 'D+': return 1.3;
-        case 'D': return 1.0;
-        case 'F': return 0.0;
-        default: return 0.0;
+        case 'A+':
+        case 'A':
+            return 4.0;
+        case 'A-':
+            return 3.7;
+        case 'B+':
+            return 3.3;
+        case 'B':
+            return 3.0;
+        case 'B-':
+            return 2.7;
+        case 'C+':
+            return 2.3;
+        case 'C':
+            return 2.0;
+        case 'C-':
+            return 1.7;
+        case 'D+':
+            return 1.3;
+        case 'D':
+            return 1.0;
+        case 'F':
+            return 0.0;
+        default:
+            return 0.0;
     }
 }
 
-function getLetterGrade($percentage) {
+function getLetterGrade($percentage)
+{
     if ($percentage >= 90) return 'A';
     if ($percentage >= 85) return 'A-';
     if ($percentage >= 80) return 'B+';
@@ -56,9 +72,9 @@ function getLetterGrade($percentage) {
 
 try {
     $pdo = getDbConnection();
-    
+
     echo "Completing the academic data...\n\n";
-    
+
     // First, add more courses
     echo "Adding additional courses...\n";
     $additionalCourses = [
@@ -67,7 +83,7 @@ try {
         ['CS402', 'Machine Learning', '2025-2026', 'Spring'],
         ['MATH201', 'Linear Algebra', '2025-2026', 'Fall']
     ];
-    
+
     foreach ($additionalCourses as $course) {
         $stmt = $pdo->prepare('
             INSERT IGNORE INTO courses (code, name, academic_year, semester, lecturer_id, created_at) 
@@ -76,15 +92,15 @@ try {
         $stmt->execute($course);
         echo "Added course: " . $course[0] . " - " . $course[1] . "\n";
     }
-    
+
     // Get all courses
     $stmt = $pdo->query('SELECT id, code, name FROM courses ORDER BY id');
     $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     // Get all students with advisor_id = 3
     $stmt = $pdo->query('SELECT id, name FROM users WHERE role = "student" AND advisor_id = 3 ORDER BY id');
     $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     echo "\nAdding enrollments for new courses...\n";
     // Add enrollments for all students to all courses
     foreach ($students as $student) {
@@ -96,9 +112,9 @@ try {
             $stmt->execute([$student['id'], $course['id']]);
         }
     }
-    
+
     echo "Enrollments completed.\n\n";
-    
+
     // Define student performance patterns for comprehensive data
     $studentProfiles = [
         'Emma Thompson' => [ // Excellent performer
@@ -142,16 +158,16 @@ try {
             'trend' => 'improving'
         ]
     ];
-    
+
     echo "Generating comprehensive marks data...\n";
-    
+
     foreach ($students as $student) {
         $profile = $studentProfiles[$student['name']];
         $courseCount = 0;
-        
+
         foreach ($courses as $course) {
             $courseCount++;
-            
+
             // Check if record already exists
             $stmt = $pdo->prepare('SELECT id FROM final_marks_custom WHERE student_id = ? AND course_id = ?');
             $stmt->execute([$student['id'], $course['id']]);
@@ -159,7 +175,7 @@ try {
                 echo "Skipping existing record for " . $student['name'] . " in " . $course['code'] . "\n";
                 continue;
             }
-            
+
             // Generate marks based on student profile and course progression
             $trendMultiplier = 1.0;
             if ($profile['trend'] === 'improving') {
@@ -167,28 +183,28 @@ try {
             } elseif ($profile['trend'] === 'declining') {
                 $trendMultiplier = 1.2 - ($courseCount * 0.1); // Starts higher, declines
             }
-            
+
             $basePerf = $profile['base_performance'] * $trendMultiplier;
             $variation = $profile['variation'];
-            
+
             // Generate component marks with realistic patterns
             $assignmentMark = max(0, min(100, $basePerf + rand(-$variation, $variation)));
-            $quizMark = max(0, min(100, $basePerf + rand(-$variation/2, $variation/2)));
+            $quizMark = max(0, min(100, $basePerf + rand(-$variation / 2, $variation / 2)));
             $testMark = max(0, min(100, $basePerf + rand(-$variation, $variation)));
-            $finalExamMark = max(0, min(100, $basePerf + rand(-$variation*1.5, $variation)));
-            
+            $finalExamMark = max(0, min(100, $basePerf + rand(-$variation * 1.5, $variation)));
+
             // Calculate percentages (realistic weightings)
             $assignmentPercentage = ($assignmentMark / 100) * 25; // 25%
             $quizPercentage = ($quizMark / 100) * 15; // 15%
             $testPercentage = ($testMark / 100) * 30; // 30%
             $finalExamPercentage = ($finalExamMark / 100) * 30; // 30%
-            
+
             $componentTotal = $assignmentPercentage + $quizPercentage + $testPercentage;
             $finalGrade = $componentTotal + $finalExamPercentage;
-            
+
             $letterGrade = getLetterGrade($finalGrade);
             $gpa = calculateGPA($letterGrade);
-            
+
             // Insert the record
             $stmt = $pdo->prepare('
                 INSERT INTO final_marks_custom (
@@ -201,30 +217,38 @@ try {
                     created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             ');
-            
+
             $stmt->execute([
-                $student['id'], $course['id'],
-                $assignmentMark, $assignmentPercentage,
-                $quizMark, $quizPercentage,
-                $testMark, $testPercentage,
-                $finalExamMark, $finalExamPercentage,
-                $componentTotal, $finalGrade, $letterGrade, $gpa
+                $student['id'],
+                $course['id'],
+                $assignmentMark,
+                $assignmentPercentage,
+                $quizMark,
+                $quizPercentage,
+                $testMark,
+                $testPercentage,
+                $finalExamMark,
+                $finalExamPercentage,
+                $componentTotal,
+                $finalGrade,
+                $letterGrade,
+                $gpa
             ]);
-            
+
             echo "Added marks for " . $student['name'] . " in " . $course['code'] . " - Grade: $letterGrade ($finalGrade%)\n";
         }
     }
-    
+
     echo "\nData completion summary:\n";
     $stmt = $pdo->query('SELECT COUNT(*) as total FROM final_marks_custom');
     echo "Total records: " . $stmt->fetch()['total'] . "\n";
-    
+
     $stmt = $pdo->query('SELECT COUNT(DISTINCT student_id) as students FROM final_marks_custom');
     echo "Students with marks: " . $stmt->fetch()['students'] . "\n";
-    
+
     $stmt = $pdo->query('SELECT COUNT(DISTINCT course_id) as courses FROM final_marks_custom');
     echo "Courses with marks: " . $stmt->fetch()['courses'] . "\n";
-    
+
     echo "\nStudent completion rates:\n";
     $stmt = $pdo->query('
         SELECT 
@@ -239,14 +263,12 @@ try {
         GROUP BY u.id, u.name
         ORDER BY u.name
     ');
-    
+
     while ($row = $stmt->fetch()) {
         echo $row['name'] . ": " . $row['completed_courses'] . "/" . $row['total_available_courses'] . " courses (" . $row['completion_rate'] . "%)\n";
     }
-    
+
     echo "\nData completion successful! 🎉\n";
-    
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";
 }
-?>

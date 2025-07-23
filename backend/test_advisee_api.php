@@ -8,7 +8,8 @@ $dotenv = Dotenv::createImmutable(__DIR__);
 $dotenv->load();
 
 // Database connection
-function getDbConnection() {
+function getDbConnection()
+{
     $host = $_ENV['DB_HOST'] ?? 'localhost';
     $dbname = $_ENV['DB_NAME'] ?? 'course_mark_management';
     $username = $_ENV['DB_USER'] ?? 'root';
@@ -26,20 +27,20 @@ function getDbConnection() {
 // Test advisee reports functionality directly
 try {
     $pdo = getDbConnection();
-    
+
     // Test login first
     echo "Testing login...\n";
     $stmt = $pdo->prepare('SELECT id, name, email, role, password FROM users WHERE email = ? AND role = "advisor"');
     $stmt->execute(['advisor1@example.com']);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+
     if ($user && password_verify('password', $user['password'])) {
         echo "✅ Login successful for advisor: " . $user['name'] . "\n";
         $advisorId = $user['id'];
-        
+
         // Now test the advisee query
         echo "\nTesting advisee data from final_marks_custom...\n";
-        
+
         // Get all advisees with their comprehensive academic information
         $stmt = $pdo->prepare('
             SELECT 
@@ -69,7 +70,7 @@ try {
         ');
         $stmt->execute([$advisorId]);
         $advisees = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
         echo "Found " . count($advisees) . " advisees:\n";
         foreach ($advisees as $advisee) {
             echo "- " . $advisee['name'] . " (ID: " . $advisee['id'] . ")\n";
@@ -79,28 +80,25 @@ try {
             echo "  Grades: A=" . $advisee['a_grades'] . ", B=" . $advisee['b_grades'] . ", C=" . $advisee['c_grades'] . ", D=" . $advisee['d_grades'] . ", F=" . $advisee['f_grades'] . "\n";
             echo "\n";
         }
-        
+
         // Calculate summary statistics
         $totalAdvisees = count($advisees);
         $avgGpa = $totalAdvisees > 0 ? array_sum(array_column($advisees, 'overall_gpa')) / $totalAdvisees : 0;
-        $atRiskCount = count(array_filter($advisees, function($a) { 
-            return ($a['overall_gpa'] ?? 0) < 2.0; 
+        $atRiskCount = count(array_filter($advisees, function ($a) {
+            return ($a['overall_gpa'] ?? 0) < 2.0;
         }));
-        $excellentCount = count(array_filter($advisees, function($a) { 
-            return ($a['overall_gpa'] ?? 0) >= 3.5; 
+        $excellentCount = count(array_filter($advisees, function ($a) {
+            return ($a['overall_gpa'] ?? 0) >= 3.5;
         }));
-        
+
         echo "Summary Statistics:\n";
         echo "- Total Advisees: " . $totalAdvisees . "\n";
         echo "- Average GPA: " . round($avgGpa, 2) . "\n";
         echo "- At Risk Students: " . $atRiskCount . "\n";
         echo "- Excellent Performers: " . $excellentCount . "\n";
-        
     } else {
         echo "❌ Login failed\n";
     }
-    
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";
 }
-?>

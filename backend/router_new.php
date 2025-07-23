@@ -7,7 +7,7 @@ $path = parse_url($uri, PHP_URL_PATH);
 // Handle legacy standalone API files
 $standalonePHPFiles = [
     '/db-api.php',
-    '/simple-api.php', 
+    '/simple-api.php',
     '/marks-api.php',
     '/feedback-api.php',
     '/breakdown-api.php',

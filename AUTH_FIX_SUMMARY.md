@@ -3,14 +3,17 @@
 ### ✅ **Problems Resolved:**
 
 1. **Template Null Reference Error**
+
    - **Issue**: `{{ userInfo.name }}` tried to access `name` property on null user object
    - **Fix**: Changed to `{{ userInfo?.name || 'Advisor' }}` with optional chaining and fallback
 
 2. **Wrong API Endpoint for Login**
+
    - **Issue**: Auth module was calling `/api/auth/login` (resolves to `localhost:8080`)
    - **Fix**: Updated to `http://localhost:8000/api/auth/login` (correct backend port)
 
 3. **Wrong API Endpoint for Register**
+
    - **Issue**: Same relative URL issue for registration
    - **Fix**: Updated to `http://localhost:8000/api/auth/register`
 
@@ -21,11 +24,13 @@
 ### 🎯 **What Should Work Now:**
 
 1. **Login Process**:
+
    - Go to http://localhost:8083
    - Use credentials: `advisor1@example.com` / `password`
    - Should successfully authenticate and redirect to dashboard
 
 2. **Dashboard Display**:
+
    - User name should display correctly (no more null errors)
    - Should load real advisee data from your `final_marks_custom` table
    - Risk chart and statistics should render properly
@@ -42,6 +47,7 @@
 4. **Logout**: Test logout works without errors
 
 ### 📊 **Expected Dashboard Data:**
+
 - **Total Advisees**: 8
 - **Emma Thompson**: Dean's List (3.87 GPA) - Low Risk
 - **Sarah Chen**: Good Standing (3.04 GPA) - Medium Risk

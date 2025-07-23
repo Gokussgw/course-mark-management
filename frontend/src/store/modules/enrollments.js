@@ -59,7 +59,7 @@ const actions = {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/courses/${courseId}/enrollments`, {
+      const response = await axios.get(`http://localhost:8000/api/courses/${courseId}/enrollments`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -83,7 +83,7 @@ const actions = {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/courses/${courseId}/available-students`, {
+      const response = await axios.get(`http://localhost:8000/api/courses/${courseId}/available-students`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

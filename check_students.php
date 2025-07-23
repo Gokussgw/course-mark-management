@@ -5,4 +5,3 @@ echo "Available students:\n";
 while ($row = $stmt->fetch()) {
     echo "ID: {$row['id']}, Name: {$row['name']}, Email: {$row['email']}\n";
 }
-?>

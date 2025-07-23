@@ -40,4 +40,3 @@ if ($response) {
         print_r($decoded);
     }
 }
-?>

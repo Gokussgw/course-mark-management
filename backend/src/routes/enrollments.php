@@ -19,7 +19,7 @@ $app->get('/api/courses/{courseId}/enrollments', function (Request $request, Res
                 e.id as enrollment_id,
                 e.academic_year,
                 e.semester,
-                e.enrolled_at,
+                e.created_at as enrolled_at,
                 u.id as student_id,
                 u.name as student_name,
                 u.email as student_email,

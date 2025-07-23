@@ -4,4 +4,3 @@ $stmt = $pdo->query('SELECT email, password FROM users WHERE role = "student" LI
 while ($row = $stmt->fetch()) {
     echo "Email: {$row['email']}, Password (first 20): " . substr($row['password'], 0, 20) . "\n";
 }
-?>

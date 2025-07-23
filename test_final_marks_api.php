@@ -60,7 +60,7 @@ if ($course_result && $course_result['success']) {
     echo "Lecturer: " . $course_result['course']['lecturer_name'] . "\n";
     echo "Performance: " . $course_result['performance']['overall_percentage'] . "% (Letter: " . $course_result['performance']['letter_grade'] . ", GPA: " . $course_result['performance']['gpa'] . ")\n";
     echo "Ranking: " . $course_result['ranking']['position'] . " out of " . $course_result['ranking']['total_students'] . " students\n";
-    
+
     echo "\nAssessments:\n";
     foreach ($course_result['assessments'] as $assessment) {
         echo "- " . $assessment['assessment_name'] . ": " . $assessment['mark'] . "/100 (Weight: " . $assessment['weightage'] . "%)\n";
@@ -68,4 +68,3 @@ if ($course_result && $course_result['success']) {
 } else {
     echo "API call failed or returned error\n";
 }
-?>

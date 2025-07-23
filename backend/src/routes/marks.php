@@ -551,7 +551,7 @@ $app->group('/api/marks', function ($group) {
 
             // Create assessments array from the marks data
             $assessments = [];
-            
+
             if ($marksData) {
                 // Assignment
                 $assessments[] = [
@@ -611,8 +611,8 @@ $app->group('/api/marks', function ($group) {
 
                 // Calculate performance metrics
                 $totalMarks = 400; // 4 components * 100 each
-                $earnedMarks = $marksData['assignment_mark'] + $marksData['quiz_mark'] + 
-                              $marksData['test_mark'] + $marksData['final_exam_mark'];
+                $earnedMarks = $marksData['assignment_mark'] + $marksData['quiz_mark'] +
+                    $marksData['test_mark'] + $marksData['final_exam_mark'];
                 $overallPercentage = $marksData['final_grade'];
 
                 $performance = [

@@ -14,7 +14,7 @@ try {
     $stmt = $pdo->query("SHOW TABLES LIKE 'final_marks_custom'");
     if ($stmt->rowCount() > 0) {
         echo "✅ final_marks_custom table exists\n";
-        
+
         // Show table structure
         $stmt = $pdo->query("DESCRIBE final_marks_custom");
         $columns = $stmt->fetchAll();
@@ -22,12 +22,12 @@ try {
         foreach ($columns as $column) {
             echo "- {$column['Field']} ({$column['Type']}) {$column['Null']} {$column['Default']}\n";
         }
-        
+
         // Check sample data
         $stmt = $pdo->query("SELECT COUNT(*) as count FROM final_marks_custom");
         $result = $stmt->fetch();
         echo "\nRecords in final_marks_custom: " . $result['count'] . "\n";
-        
+
         if ($result['count'] > 0) {
             $stmt = $pdo->query("SELECT * FROM final_marks_custom LIMIT 1");
             $sample = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -38,7 +38,7 @@ try {
         }
     } else {
         echo "❌ final_marks_custom table does NOT exist\n";
-        
+
         // Check other tables
         $stmt = $pdo->query("SHOW TABLES");
         $tables = $stmt->fetchAll();
@@ -50,4 +50,3 @@ try {
 } catch (PDOException $e) {
     echo "❌ Database error: " . $e->getMessage() . "\n";
 }
-?>

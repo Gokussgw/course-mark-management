@@ -42,7 +42,7 @@ try {
     ");
     $courseStmt->execute([$student_id, $course_id]);
     $course = $courseStmt->fetch(PDO::FETCH_ASSOC);
-    
+
     if ($course) {
         echo "✅ Course found: " . $course['code'] . " - " . $course['name'] . "\n";
         echo "Enrollment ID: " . ($course['enrollment_id'] ?: 'NULL') . "\n";
@@ -52,4 +52,3 @@ try {
 } catch (PDOException $e) {
     echo "❌ Course query error: " . $e->getMessage() . "\n";
 }
-?>

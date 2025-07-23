@@ -398,8 +398,8 @@ export default {
     this.courseId = this.$route.params.courseId;
     console.log('EnrollmentManagement component loaded for courseId:', this.courseId);
     
-    // Load temporary data for testing
-    await this.loadTemporaryData();
+    // Load real data from the API
+    await this.loadData();
   },
   methods: {
     async loadTemporaryData() {

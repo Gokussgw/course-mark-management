@@ -45,8 +45,6 @@ try {
     foreach ($enrollments as $enrollment) {
         echo "Enrollment ID: {$enrollment['id']}, Student: {$enrollment['student_name']} (ID: {$enrollment['student_id']}), Course: {$enrollment['course_code']} - {$enrollment['course_name']} (ID: {$enrollment['course_id']})\n";
     }
-
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";
 }
-?>

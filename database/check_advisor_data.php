@@ -34,7 +34,7 @@ try {
     if (!empty($students)) {
         $studentIds = array_column($students, 'id');
         $placeholders = str_repeat('?,', count($studentIds) - 1) . '?';
-        
+
         $stmt = $pdo->prepare("
             SELECT fm.student_id, u.name as student_name, u.advisor_id, 
                    fm.course_id, c.code as course_code, fm.letter_grade, fm.gpa
@@ -46,7 +46,7 @@ try {
         ");
         $stmt->execute($studentIds);
         $marks = $stmt->fetchAll();
-        
+
         echo "Final marks for advisee students:\n";
         foreach ($marks as $mark) {
             echo "- Student: {$mark['student_name']} (ID: {$mark['student_id']}, Advisor: {$mark['advisor_id']}) - Course: {$mark['course_code']} - Grade: {$mark['letter_grade']} (GPA: {$mark['gpa']})\n";
@@ -60,8 +60,6 @@ try {
     $stmt->execute();
     $advisorExists = $stmt->fetch();
     echo "Advisor with ID 3 exists: " . ($advisorExists['count'] > 0 ? "YES" : "NO") . "\n";
-
 } catch (PDOException $e) {
     echo "❌ Database error: " . $e->getMessage() . "\n";
 }
-?>

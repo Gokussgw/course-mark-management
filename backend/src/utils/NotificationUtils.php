@@ -5,7 +5,8 @@
  * Handles sending notifications for marks updates and other academic events
  */
 
-function sendMarkUpdateNotification($pdo, $courseId, $studentId, $lecturerId, $componentType, $newMark) {
+function sendMarkUpdateNotification($pdo, $courseId, $studentId, $lecturerId, $componentType, $newMark)
+{
     try {
         // Get course and student information
         $courseStmt = $pdo->prepare("
@@ -32,7 +33,7 @@ function sendMarkUpdateNotification($pdo, $courseId, $studentId, $lecturerId, $c
         // Format component name
         $componentNames = [
             'assignment' => 'Assignment',
-            'quiz' => 'Quiz', 
+            'quiz' => 'Quiz',
             'test' => 'Test',
             'final_exam' => 'Final Exam'
         ];
@@ -40,7 +41,7 @@ function sendMarkUpdateNotification($pdo, $courseId, $studentId, $lecturerId, $c
 
         // Send notification to student
         $studentContent = "Your {$componentName} mark for {$course['code']} - {$course['course_name']} has been updated. New mark: {$newMark}%. Please check your academic dashboard for details.";
-        
+
         $studentNotification = $pdo->prepare("
             INSERT INTO notifications (user_id, type, content, related_id, sender_id, created_at) 
             VALUES (?, 'mark', ?, ?, ?, NOW())
@@ -49,7 +50,7 @@ function sendMarkUpdateNotification($pdo, $courseId, $studentId, $lecturerId, $c
 
         // Send notification to lecturer (confirmation)
         $lecturerContent = "Mark update confirmed for {$student['name']} in {$course['code']} - {$componentName}: {$newMark}%. Student has been notified automatically.";
-        
+
         $lecturerNotification = $pdo->prepare("
             INSERT INTO notifications (user_id, type, content, related_id, sender_id, created_at) 
             VALUES (?, 'mark', ?, ?, ?, NOW())
@@ -63,7 +64,8 @@ function sendMarkUpdateNotification($pdo, $courseId, $studentId, $lecturerId, $c
     }
 }
 
-function sendBulkMarkUpdateNotification($pdo, $courseId, $lecturerId, $componentType, $studentsUpdated) {
+function sendBulkMarkUpdateNotification($pdo, $courseId, $lecturerId, $componentType, $studentsUpdated)
+{
     try {
         // Get course information
         $courseStmt = $pdo->prepare("
@@ -82,7 +84,7 @@ function sendBulkMarkUpdateNotification($pdo, $courseId, $lecturerId, $component
         // Format component name
         $componentNames = [
             'assignment' => 'Assignment',
-            'quiz' => 'Quiz', 
+            'quiz' => 'Quiz',
             'test' => 'Test',
             'final_exam' => 'Final Exam'
         ];
@@ -101,7 +103,7 @@ function sendBulkMarkUpdateNotification($pdo, $courseId, $lecturerId, $component
         $notificationsSent = 0;
         foreach ($students as $student) {
             $studentContent = "New {$componentName} marks have been released for {$course['code']} - {$course['course_name']}. Please check your academic dashboard to view your results.";
-            
+
             $studentNotification = $pdo->prepare("
                 INSERT INTO notifications (user_id, type, content, related_id, sender_id, created_at) 
                 VALUES (?, 'mark', ?, ?, ?, NOW())
@@ -112,7 +114,7 @@ function sendBulkMarkUpdateNotification($pdo, $courseId, $lecturerId, $component
 
         // Send confirmation to lecturer
         $lecturerContent = "Bulk mark update completed for {$course['code']} - {$componentName}. {$notificationsSent} students have been automatically notified of their new marks.";
-        
+
         $lecturerNotification = $pdo->prepare("
             INSERT INTO notifications (user_id, type, content, related_id, sender_id, created_at) 
             VALUES (?, 'mark', ?, ?, ?, NOW())
@@ -126,7 +128,8 @@ function sendBulkMarkUpdateNotification($pdo, $courseId, $lecturerId, $component
     }
 }
 
-function sendCourseAnnouncementNotification($pdo, $courseId, $lecturerId, $title, $message, $includeMarks = false) {
+function sendCourseAnnouncementNotification($pdo, $courseId, $lecturerId, $title, $message, $includeMarks = false)
+{
     try {
         // Get course information
         $courseStmt = $pdo->prepare("
@@ -155,11 +158,11 @@ function sendCourseAnnouncementNotification($pdo, $courseId, $lecturerId, $title
         $notificationsSent = 0;
         foreach ($students as $student) {
             $content = "{$title}\n\n{$message}\n\nCourse: {$course['code']} - {$course['course_name']}\nFrom: {$course['lecturer_name']}";
-            
+
             if ($includeMarks) {
                 $content .= "\n\nPlease check your academic dashboard for updated marks.";
             }
-            
+
             $studentNotification = $pdo->prepare("
                 INSERT INTO notifications (user_id, type, content, related_id, sender_id, created_at) 
                 VALUES (?, 'course', ?, ?, ?, NOW())
@@ -170,7 +173,7 @@ function sendCourseAnnouncementNotification($pdo, $courseId, $lecturerId, $title
 
         // Send confirmation to lecturer
         $lecturerContent = "Course announcement sent successfully to {$notificationsSent} students in {$course['code']} - {$course['course_name']}.";
-        
+
         $lecturerNotification = $pdo->prepare("
             INSERT INTO notifications (user_id, type, content, related_id, sender_id, created_at) 
             VALUES (?, 'course', ?, ?, ?, NOW())
@@ -184,7 +187,8 @@ function sendCourseAnnouncementNotification($pdo, $courseId, $lecturerId, $title
     }
 }
 
-function getUnreadNotificationCount($pdo, $userId) {
+function getUnreadNotificationCount($pdo, $userId)
+{
     try {
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as count 
@@ -200,11 +204,12 @@ function getUnreadNotificationCount($pdo, $userId) {
     }
 }
 
-function getRecentNotifications($pdo, $userId, $limit = 10) {
+function getRecentNotifications($pdo, $userId, $limit = 10)
+{
     try {
         // Ensure limit is a positive integer for security
         $limit = max(1, min(100, intval($limit)));
-        
+
         $stmt = $pdo->prepare("
             SELECT 
                 n.*,
@@ -222,5 +227,3 @@ function getRecentNotifications($pdo, $userId, $limit = 10) {
         return [];
     }
 }
-
-?>

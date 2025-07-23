@@ -47,19 +47,19 @@ echo "HTTP Response Code: $httpCode\n";
 
 if ($httpCode === 200) {
     $data = json_decode($response, true);
-    
+
     if ($data['success']) {
         echo "✅ API Request Successful!\n\n";
-        
+
         $summary = $data['data']['summary'];
         $advisees = $data['data']['advisees'];
-        
+
         echo "📊 SUMMARY STATISTICS:\n";
         echo "Total Advisees: " . $summary['total_advisees'] . "\n";
         echo "Average GPA: " . $summary['avg_gpa'] . "\n";
         echo "At Risk Students: " . $summary['at_risk_count'] . "\n";
         echo "Excellent Performers: " . $summary['excellent_performers'] . "\n\n";
-        
+
         echo "👥 INDIVIDUAL ADVISEES:\n";
         foreach ($advisees as $advisee) {
             echo "\n🎓 " . $advisee['name'] . " (" . $advisee['matric_number'] . ")\n";
@@ -70,14 +70,13 @@ if ($httpCode === 200) {
             echo "   Performance: " . ($advisee['performance_trend'] ?? 'N/A') . "\n";
             echo "   Risk Level: " . (count($advisee['risk_indicators'] ?? []) >= 3 ? 'High' : (count($advisee['risk_indicators'] ?? []) >= 2 ? 'Medium' : (count($advisee['risk_indicators'] ?? []) >= 1 ? 'Low' : 'No Risk'))) . "\n";
         }
-        
+
         echo "\n🎯 DATA QUALITY CHECK:\n";
         echo "✅ All students have complete course records\n";
         echo "✅ Grade distributions are realistic\n";
         echo "✅ Performance trends calculated\n";
         echo "✅ Risk indicators generated\n";
         echo "✅ Frontend-ready data structure\n";
-        
     } else {
         echo "❌ API Error: " . ($data['error'] ?? 'Unknown error') . "\n";
     }
@@ -91,4 +90,3 @@ echo "Frontend should display this data at: http://localhost:8083\n";
 echo "Login with: advisor1@example.com / password\n";
 echo "Navigate to: Advisor Dashboard > Advisee Reports\n";
 echo str_repeat("=", 50) . "\n";
-?>

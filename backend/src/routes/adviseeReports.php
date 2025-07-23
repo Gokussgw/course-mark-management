@@ -36,17 +36,17 @@ $app->group('/api/advisee-reports', function ($group) {
             $response->getBody()->write(json_encode(['error' => 'Invalid authorization header format']));
             return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
         }
-        
+
         $pdo = $this->get('pdo');
-        
+
         // Debug: Let's see what user data we have
         error_log('User attribute in advisee reports: ' . print_r($user, true));
-        
+
         if (!$user) {
             $response->getBody()->write(json_encode(['error' => 'User not authenticated', 'debug' => 'No user attribute found']));
             return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
         }
-        
+
         if ($user->role !== 'advisor') {
             $response->getBody()->write(json_encode(['error' => 'Advisor access required', 'current_role' => $user->role ?? 'undefined']));
             return $response->withStatus(403)->withHeader('Content-Type', 'application/json');
@@ -54,11 +54,11 @@ $app->group('/api/advisee-reports', function ($group) {
 
         try {
             $advisorId = $user->id;
-            
+
             // Debug: Log the advisor ID and user info
             error_log('Debug - Advisor ID: ' . $advisorId);
             error_log('Debug - User object: ' . print_r($user, true));
-            
+
             // First, let's check if we can find advisees at all
             $stmt = $pdo->prepare('
                 SELECT u.id, u.name, u.email, u.advisor_id 
@@ -67,14 +67,14 @@ $app->group('/api/advisee-reports', function ($group) {
             ');
             $stmt->execute([$advisorId]);
             $basicAdvisees = $stmt->fetchAll();
-            
+
             error_log('Debug - Basic advisees count: ' . count($basicAdvisees));
-            
+
             // If we have basic advisees, continue with the complex query
             if (count($basicAdvisees) > 0) {
 
-            // Get all advisees with their comprehensive academic information
-            $stmt = $pdo->prepare('
+                // Get all advisees with their comprehensive academic information
+                $stmt = $pdo->prepare('
                 SELECT 
                     u.id,
                     u.name,
@@ -84,10 +84,10 @@ $app->group('/api/advisee-reports', function ($group) {
                     COUNT(DISTINCT e.course_id) as total_courses,
                     COUNT(DISTINCT fm.id) as completed_courses,
                     AVG(fm.gpa) as overall_gpa,
-                    AVG(fm.assignment_percentage) as avg_assignment_percentage,
-                    AVG(fm.quiz_percentage) as avg_quiz_percentage,
-                    AVG(fm.test_percentage) as avg_test_percentage,
-                    AVG(fm.final_exam_percentage) as avg_final_exam_percentage,
+                    AVG(fm.assignment_mark) as avg_assignment_mark,
+                    AVG(fm.quiz_mark) as avg_quiz_mark,
+                    AVG(fm.test_mark) as avg_test_mark,
+                    AVG(fm.final_exam_mark) as avg_final_exam_mark,
                     COUNT(CASE WHEN fm.letter_grade IN ("A+", "A", "A-") THEN 1 END) as a_grades,
                     COUNT(CASE WHEN fm.letter_grade IN ("B+", "B", "B-") THEN 1 END) as b_grades,
                     COUNT(CASE WHEN fm.letter_grade IN ("C+", "C", "C-") THEN 1 END) as c_grades,
@@ -100,13 +100,13 @@ $app->group('/api/advisee-reports', function ($group) {
                 GROUP BY u.id
                 ORDER BY u.name
             ');
-            $stmt->execute([$advisorId]);
-            $advisees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $stmt->execute([$advisorId]);
+                $advisees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Calculate performance trends and risk indicators for each advisee
-            foreach ($advisees as &$advisee) {
-                // Get course details for trend calculation
-                $stmt = $pdo->prepare('
+                // Calculate performance trends and risk indicators for each advisee
+                foreach ($advisees as &$advisee) {
+                    // Get course details for trend calculation
+                    $stmt = $pdo->prepare('
                     SELECT 
                         fm.final_grade as overall_percentage,
                         fm.created_at
@@ -114,41 +114,40 @@ $app->group('/api/advisee-reports', function ($group) {
                     WHERE fm.student_id = ? AND fm.final_grade IS NOT NULL
                     ORDER BY fm.created_at
                 ');
-                $stmt->execute([$advisee['id']]);
-                $coursePerformances = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    $stmt->execute([$advisee['id']]);
+                    $coursePerformances = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                // Calculate performance trend
-                $advisee['performance_trend'] = calculatePerformanceTrend($coursePerformances);
-                
-                // Identify at-risk indicators
-                $advisee['risk_indicators'] = identifyRiskIndicators($advisee);
-                
-                // Get improvement suggestions
-                $advisee['suggestions'] = generateSuggestions($advisee);
-            }
+                    // Calculate performance trend
+                    $advisee['performance_trend'] = calculatePerformanceTrend($coursePerformances);
 
-            // Calculate summary statistics
-            $totalAdvisees = count($advisees);
-            $avgGpa = $totalAdvisees > 0 ? array_sum(array_column($advisees, 'overall_gpa')) / $totalAdvisees : 0;
-            $atRiskCount = count(array_filter($advisees, function($a) { 
-                return ($a['overall_gpa'] ?? 0) < 2.0; 
-            }));
+                    // Identify at-risk indicators
+                    $advisee['risk_indicators'] = identifyRiskIndicators($advisee);
 
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'data' => [
-                    'advisees' => $advisees,
-                    'summary' => [
-                        'total_advisees' => $totalAdvisees,
-                        'avg_gpa' => round($avgGpa, 2),
-                        'at_risk_count' => $atRiskCount,
-                        'excellent_performers' => count(array_filter($advisees, function($a) { 
-                            return ($a['overall_gpa'] ?? 0) >= 3.5; 
-                        }))
+                    // Get improvement suggestions
+                    $advisee['suggestions'] = generateSuggestions($advisee);
+                }
+
+                // Calculate summary statistics
+                $totalAdvisees = count($advisees);
+                $avgGpa = $totalAdvisees > 0 ? array_sum(array_column($advisees, 'overall_gpa')) / $totalAdvisees : 0;
+                $atRiskCount = count(array_filter($advisees, function ($a) {
+                    return ($a['overall_gpa'] ?? 0) < 2.0;
+                }));
+
+                $response->getBody()->write(json_encode([
+                    'success' => true,
+                    'data' => [
+                        'advisees' => $advisees,
+                        'summary' => [
+                            'total_advisees' => $totalAdvisees,
+                            'avg_gpa' => round($avgGpa, 2),
+                            'at_risk_count' => $atRiskCount,
+                            'excellent_performers' => count(array_filter($advisees, function ($a) {
+                                return ($a['overall_gpa'] ?? 0) >= 3.5;
+                            }))
+                        ]
                     ]
-                ]
-            ]));
-            
+                ]));
             } else {
                 // No advisees found
                 $response->getBody()->write(json_encode([
@@ -164,9 +163,8 @@ $app->group('/api/advisee-reports', function ($group) {
                     ]
                 ]));
             }
-            
-            return $response->withHeader('Content-Type', 'application/json');
 
+            return $response->withHeader('Content-Type', 'application/json');
         } catch (Exception $e) {
             error_log('Advisee reports error: ' . $e->getMessage());
             $response->getBody()->write(json_encode(['error' => 'Failed to generate reports']));
@@ -202,9 +200,9 @@ $app->group('/api/advisee-reports', function ($group) {
             $response->getBody()->write(json_encode(['error' => 'Invalid authorization header format']));
             return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
         }
-        
+
         $pdo = $this->get('pdo');
-        
+
         if (!$user || $user->role !== 'advisor') {
             $response->getBody()->write(json_encode(['error' => 'Advisor access required']));
             return $response->withStatus(403)->withHeader('Content-Type', 'application/json');
@@ -299,7 +297,8 @@ $app->group('/api/advisee-reports', function ($group) {
                 'grade_distribution' => calculateGradeDistribution($courses),
                 'component_strengths' => analyzeComponentStrengths($courses),
                 'performance_trend' => calculateDetailedTrend($courses),
-                'recommendations' => generateDetailedRecommendations($student, $courses)
+                'recommendations' => generateDetailedRecommendations($student, $courses),
+                'risk_indicators' => calculateRiskIndicators($student, $courses)
             ];
 
             $response->getBody()->write(json_encode([
@@ -308,11 +307,11 @@ $app->group('/api/advisee-reports', function ($group) {
                     'student' => $student,
                     'courses' => $courses,
                     'notes' => $notes,
-                    'analytics' => $analytics
+                    'analytics' => $analytics,
+                    'risk_indicators' => calculateRiskIndicators($student, $courses)
                 ]
             ]));
             return $response->withHeader('Content-Type', 'application/json');
-
         } catch (Exception $e) {
             error_log('Individual advisee report error: ' . $e->getMessage());
             $response->getBody()->write(json_encode(['error' => 'Failed to generate individual report']));
@@ -348,9 +347,9 @@ $app->group('/api/advisee-reports', function ($group) {
             $response->getBody()->write(json_encode(['error' => 'Invalid authorization header format']));
             return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
         }
-        
+
         $pdo = $this->get('pdo');
-        
+
         if (!$user || $user->role !== 'advisor') {
             $response->getBody()->write(json_encode(['error' => 'Advisor access required']));
             return $response->withStatus(403)->withHeader('Content-Type', 'application/json');
@@ -396,24 +395,23 @@ $app->group('/api/advisee-reports', function ($group) {
             if (!empty($data)) {
                 // Add headers
                 $csvContent .= implode(',', array_keys($data[0])) . "\n";
-                
+
                 // Add data rows
                 foreach ($data as $row) {
-                    $csvContent .= implode(',', array_map(function($value) {
+                    $csvContent .= implode(',', array_map(function ($value) {
                         return '"' . str_replace('"', '""', $value ?? '') . '"';
                     }, array_values($row))) . "\n";
                 }
             }
 
             $filename = 'advisee_reports_' . date('Y-m-d_H-i-s') . '.csv';
-            
+
             $response = $response
                 ->withHeader('Content-Type', 'text/csv')
                 ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"');
-            
+
             $response->getBody()->write($csvContent);
             return $response;
-
         } catch (Exception $e) {
             error_log('CSV export error: ' . $e->getMessage());
             $response->getBody()->write(json_encode(['error' => 'Failed to export CSV']));
@@ -423,81 +421,87 @@ $app->group('/api/advisee-reports', function ($group) {
 });
 
 // Helper functions
-function calculatePerformanceTrend($coursePerformances) {
+function calculatePerformanceTrend($coursePerformances)
+{
     if (count($coursePerformances) < 2) {
         return 'insufficient_data';
     }
-    
+
     $performances = array_column($coursePerformances, 'overall_percentage');
-    $recentHalf = array_slice($performances, -ceil(count($performances)/2));
-    $earlierHalf = array_slice($performances, 0, floor(count($performances)/2));
-    
+    $recentHalf = array_slice($performances, -ceil(count($performances) / 2));
+    $earlierHalf = array_slice($performances, 0, floor(count($performances) / 2));
+
     $recentAvg = array_sum($recentHalf) / count($recentHalf);
     $earlierAvg = array_sum($earlierHalf) / count($earlierHalf);
-    
+
     $difference = $recentAvg - $earlierAvg;
-    
+
     if ($difference > 5) return 'improving';
     if ($difference < -5) return 'declining';
     return 'stable';
 }
 
-function identifyRiskIndicators($advisee) {
+function identifyRiskIndicators($advisee)
+{
     $indicators = [];
-    
+
     if (($advisee['overall_gpa'] ?? 0) < 2.0) {
         $indicators[] = 'low_gpa';
     }
-    
+
     if (($advisee['f_grades'] ?? 0) > 0) {
         $indicators[] = 'failing_grades';
     }
-    
-    if (($advisee['avg_assignment_percentage'] ?? 0) < 50) {
+
+    // Use raw marks with 60% threshold (consistent with individual reports)
+    if (($advisee['avg_assignment_mark'] ?? 0) < 60) {
         $indicators[] = 'poor_assignment_performance';
     }
-    
-    if (($advisee['avg_quiz_percentage'] ?? 0) < 50) {
+
+    if (($advisee['avg_quiz_mark'] ?? 0) < 60) {
         $indicators[] = 'poor_quiz_performance';
     }
-    
-    if (($advisee['completed_courses'] ?? 0) < ($advisee['total_courses'] ?? 1) * 0.7) {
-        $indicators[] = 'low_completion_rate';
+
+    // Check for insufficient completed courses (less than 3)
+    if (($advisee['completed_courses'] ?? 0) < 3) {
+        $indicators[] = 'insufficient_completed_courses';
     }
-    
+
     return $indicators;
 }
 
-function generateSuggestions($advisee) {
+function generateSuggestions($advisee)
+{
     $suggestions = [];
     $riskIndicators = $advisee['risk_indicators'] ?? [];
-    
+
     if (in_array('low_gpa', $riskIndicators)) {
         $suggestions[] = 'Schedule regular academic support meetings';
         $suggestions[] = 'Consider course load reduction';
     }
-    
+
     if (in_array('poor_assignment_performance', $riskIndicators)) {
         $suggestions[] = 'Provide time management guidance';
         $suggestions[] = 'Connect with writing center resources';
     }
-    
+
     if (in_array('poor_quiz_performance', $riskIndicators)) {
         $suggestions[] = 'Recommend study group participation';
         $suggestions[] = 'Suggest active learning techniques';
     }
-    
+
     if (empty($suggestions)) {
         $suggestions[] = 'Continue current academic progress';
         $suggestions[] = 'Consider advanced course opportunities';
     }
-    
+
     return $suggestions;
 }
 
-function calculateGradeDistribution($courses) {
+function calculateGradeDistribution($courses)
+{
     $distribution = ['A' => 0, 'B' => 0, 'C' => 0, 'D' => 0, 'F' => 0];
-    
+
     foreach ($courses as $course) {
         if ($course['letter_grade']) {
             $gradeCategory = substr($course['letter_grade'], 0, 1);
@@ -506,41 +510,43 @@ function calculateGradeDistribution($courses) {
             }
         }
     }
-    
+
     return $distribution;
 }
 
-function analyzeComponentStrengths($courses) {
+function analyzeComponentStrengths($courses)
+{
     $components = ['assignment', 'quiz', 'test', 'final_exam'];
     $strengths = [];
-    
+
     foreach ($components as $component) {
-        $percentages = [];
+        $marks = [];
         foreach ($courses as $course) {
-            $percentage = $course[$component . '_percentage'];
-            if ($percentage !== null && $percentage > 0) {
-                $percentages[] = (float)$percentage;
+            $mark = $course[$component . '_mark'];
+            if ($mark !== null && $mark > 0) {
+                $marks[] = (float)$mark;
             }
         }
-        
-        if (!empty($percentages)) {
-            $avg = array_sum($percentages) / count($percentages);
+
+        if (!empty($marks)) {
+            $avg = array_sum($marks) / count($marks);
             $strengths[$component] = round($avg, 2);
         }
     }
-    
+
     return $strengths;
 }
 
-function calculateDetailedTrend($courses) {
-    $gradedCourses = array_filter($courses, function($course) {
+function calculateDetailedTrend($courses)
+{
+    $gradedCourses = array_filter($courses, function ($course) {
         return $course['overall_percentage'] !== null;
     });
-    
-    usort($gradedCourses, function($a, $b) {
+
+    usort($gradedCourses, function ($a, $b) {
         return strtotime($a['completion_date'] ?? 0) - strtotime($b['completion_date'] ?? 0);
     });
-    
+
     $trend = [];
     foreach ($gradedCourses as $course) {
         $trend[] = [
@@ -550,18 +556,19 @@ function calculateDetailedTrend($courses) {
             'date' => $course['completion_date']
         ];
     }
-    
+
     return $trend;
 }
 
-function generateDetailedRecommendations($student, $courses) {
+function generateDetailedRecommendations($student, $courses)
+{
     $recommendations = [];
-    
+
     $gpa = $student['overall_gpa'] ?? 0;
-    $completedCourses = count(array_filter($courses, function($c) { 
-        return $c['overall_percentage'] !== null; 
+    $completedCourses = count(array_filter($courses, function ($c) {
+        return $c['overall_percentage'] !== null;
     }));
-    
+
     // GPA-based recommendations
     if ($gpa >= 3.5) {
         $recommendations[] = [
@@ -588,10 +595,10 @@ function generateDetailedRecommendations($student, $courses) {
             'priority' => 'urgent'
         ];
     }
-    
+
     // Component-specific recommendations
     $components = analyzeComponentStrengths($courses);
-    
+
     foreach ($components as $component => $avg) {
         if ($avg < 60) {
             $recommendations[] = [
@@ -601,8 +608,52 @@ function generateDetailedRecommendations($student, $courses) {
             ];
         }
     }
-    
+
     return $recommendations;
 }
 
-?>
+function calculateRiskIndicators($student, $courses)
+{
+    $riskIndicators = [];
+
+    $gpa = floatval($student['overall_gpa'] ?? 0);
+    $completedCourses = count(array_filter($courses, function ($c) {
+        return $c['overall_percentage'] !== null;
+    }));
+
+    // GPA-based risk indicators
+    if ($gpa < 2.0) {
+        $riskIndicators[] = 'low_gpa';
+    }
+
+    // Check for failing grades
+    $failingGrades = count(array_filter($courses, function ($c) {
+        return $c['letter_grade'] === 'F';
+    }));
+
+    if ($failingGrades > 0) {
+        $riskIndicators[] = 'failing_grades';
+    }
+
+    // Check component performance using raw marks instead of weighted percentages
+    if ($completedCourses > 0) {
+        $avgAssignment = array_sum(array_column($courses, 'assignment_mark')) / $completedCourses;
+        $avgQuiz = array_sum(array_column($courses, 'quiz_mark')) / $completedCourses;
+
+        if ($avgAssignment < 60) {
+            $riskIndicators[] = 'poor_assignment_performance';
+        }
+
+        if ($avgQuiz < 60) {
+            $riskIndicators[] = 'poor_quiz_performance';
+        }
+    }
+
+    // Check completion rate - only flag if very low number of completed courses
+    // This is more realistic than checking against total enrollments
+    if ($completedCourses < 3) {
+        $riskIndicators[] = 'insufficient_completed_courses';
+    }
+
+    return $riskIndicators;
+}

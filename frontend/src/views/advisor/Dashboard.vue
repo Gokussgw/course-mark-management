@@ -278,7 +278,7 @@
                     </td>
                     <td>{{ student.matric_number }}</td>
                     <td>
-                      <strong :class="getGpaClass(student.gpa)">{{ student.gpa }}%</strong>
+                      <strong :class="getGpaClass(student.gpa)">{{ student.gpa }}</strong>
                     </td>
                     <td>
                       <span class="badge bg-info">#{{ student.overall_rank }} / {{ student.total_students }}</span>
@@ -756,9 +756,9 @@ export default {
     },
 
     getGpaClass(gpa) {
-      if (gpa >= 80) return 'text-success';
-      if (gpa >= 70) return 'text-info';
-      if (gpa >= 60) return 'text-warning';
+      if (gpa >= 3.5) return 'text-success';
+      if (gpa >= 3.0) return 'text-info';
+      if (gpa >= 2.5) return 'text-warning';
       return 'text-danger';
     },
 

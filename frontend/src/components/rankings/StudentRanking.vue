@@ -24,7 +24,7 @@
           </div>
           <div class="col-md-4">
             <div class="ranking-card gpa-card">
-              <div class="ranking-number">{{ individualRanking.gpa }}%</div>
+              <div class="ranking-number">{{ individualRanking.gpa }}</div>
               <div class="ranking-label">Current GPA</div>
               <div class="ranking-detail">{{ individualRanking.courses_taken }} courses taken</div>
             </div>
@@ -119,7 +119,7 @@
                 </td>
                 <td>{{ student.matric_number }}</td>
                 <td>
-                  <strong :class="getGpaClass(student.gpa)">{{ student.gpa }}%</strong>
+                  <strong :class="getGpaClass(student.gpa)">{{ student.gpa }}</strong>
                 </td>
                 <td>{{ student.courses_taken }}</td>
                 <td>{{ student.assessments_completed }}</td>
@@ -322,9 +322,9 @@ export default {
     },
 
     getGpaClass(gpa) {
-      if (gpa >= 80) return 'text-success'
-      if (gpa >= 70) return 'text-info'
-      if (gpa >= 60) return 'text-warning'
+      if (gpa >= 3.5) return 'text-success'
+      if (gpa >= 3.0) return 'text-info'
+      if (gpa >= 2.5) return 'text-warning'
       return 'text-danger'
     }
   }

@@ -19,9 +19,9 @@ try {
     ');
     $stmt->execute([$advisorId]);
     $basicAdvisees = $stmt->fetchAll();
-    
+
     echo "✅ Basic advisees query successful: " . count($basicAdvisees) . " students found\n";
-    
+
     // Test the complex query
     $stmt = $pdo->prepare('
         SELECT 
@@ -43,17 +43,15 @@ try {
     ');
     $stmt->execute([$advisorId]);
     $testAdvisee = $stmt->fetch();
-    
+
     if ($testAdvisee) {
         echo "✅ Complex advisees query successful\n";
         echo "Sample advisee: " . $testAdvisee['name'] . "\n";
     } else {
         echo "❌ Complex advisees query returned no results\n";
     }
-
 } catch (PDOException $e) {
     echo "❌ Database error: " . $e->getMessage() . "\n";
 } catch (Exception $e) {
     echo "❌ General error: " . $e->getMessage() . "\n";
 }
-?>

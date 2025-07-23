@@ -153,16 +153,25 @@
               </h5>
             </div>
             <div class="card-body">
-              <div v-if="studentData.suggestions && studentData.suggestions.length > 0">
+              <div v-if="studentData.analytics && studentData.analytics.recommendations && studentData.analytics.recommendations.length > 0">
                 <ul class="list-unstyled">
                   <li 
-                    v-for="suggestion in studentData.suggestions" 
-                    :key="suggestion"
+                    v-for="recommendation in studentData.analytics.recommendations" 
+                    :key="recommendation.text"
                     class="mb-3"
                   >
                     <div class="d-flex">
                       <i class="fas fa-arrow-right text-primary me-2 mt-1"></i>
-                      <span>{{ suggestion }}</span>
+                      <div>
+                        <strong>{{ recommendation.category }}:</strong>
+                        <span class="ms-1">{{ recommendation.text }}</span>
+                        <span 
+                          class="badge ms-2" 
+                          :class="getPriorityBadgeClass(recommendation.priority)"
+                        >
+                          {{ recommendation.priority }}
+                        </span>
+                      </div>
                     </div>
                   </li>
                 </ul>
@@ -187,7 +196,7 @@
             <div class="card-body">
               <div class="grade-chart">
                 <div 
-                  v-for="(count, grade) in studentData.grade_distribution" 
+                  v-for="(count, grade) in studentData.analytics.grade_distribution" 
                   :key="grade"
                   class="grade-bar mb-3"
                 >
@@ -213,9 +222,9 @@
               <h5 class="mb-0">Component Strengths Analysis</h5>
             </div>
             <div class="card-body">
-              <div v-if="studentData.component_strengths">
+              <div v-if="studentData.analytics && studentData.analytics.component_strengths">
                 <div 
-                  v-for="(strength, component) in studentData.component_strengths" 
+                  v-for="(average, component) in studentData.analytics.component_strengths" 
                   :key="component"
                   class="mb-3"
                 >
@@ -223,19 +232,19 @@
                     <span class="fw-bold">{{ formatComponentName(component) }}</span>
                     <span 
                       class="badge" 
-                      :class="getStrengthBadgeClass(strength.performance)"
+                      :class="getComponentBadgeClass(average)"
                     >
-                      {{ (parseFloat(strength.average) || 0).toFixed(1) }}%
+                      {{ (parseFloat(average) || 0).toFixed(1) }}%
                     </span>
                   </div>
                   <div class="progress">
                     <div 
                       class="progress-bar" 
-                      :class="getStrengthProgressClass(strength.performance)"
-                      :style="{ width: (strength.average || 0) + '%' }"
+                      :class="getComponentProgressClass(average)"
+                      :style="{ width: (average || 0) + '%' }"
                     ></div>
                   </div>
-                  <small class="text-muted">{{ strength.performance }}</small>
+                  <small class="text-muted">{{ getPerformanceText(average) }}</small>
                 </div>
               </div>
               <div v-else class="text-center text-muted">
@@ -261,59 +270,68 @@
                   <th>Credit Hours</th>
                   <th>Final Grade</th>
                   <th>Grade Point</th>
-                  <th>Assignment Avg</th>
-                  <th>Quiz Avg</th>
-                  <th>Exam Score</th>
+                  <th>Assignment %</th>
+                  <th>Quiz %</th>
+                  <th>Test %</th>
+                  <th>Exam %</th>
                   <th>Performance</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="course in studentData.course_details" :key="course.course_id">
+                <tr v-for="course in studentData.courses" :key="course.id">
                   <td>
-                    <div class="fw-bold">{{ course.course_name }}</div>
+                    <div class="fw-bold">{{ course.name }}</div>
                     <small class="text-muted">{{ course.semester || 'Current' }}</small>
                   </td>
-                  <td>{{ course.course_code }}</td>
+                  <td>{{ course.code }}</td>
                   <td>{{ course.credit_hours || 3 }}</td>
                   <td>
                     <span 
                       class="badge fs-6" 
-                      :class="getGradeBadgeClass(course.final_grade)"
+                      :class="getGradeBadgeClass(course.letter_grade)"
                     >
-                      {{ course.final_grade || 'N/A' }}
+                      {{ course.letter_grade || 'N/A' }}
                     </span>
                   </td>
-                  <td>{{ (parseFloat(course.grade_point) || 0).toFixed(2) }}</td>
+                  <td>{{ (parseFloat(course.gpa) || 0).toFixed(2) }}</td>
                   <td>
                     <span 
                       class="badge" 
-                      :class="getPerformanceBadgeClass(course.assignment_average)"
+                      :class="getPerformanceBadgeClass(course.assignment_mark)"
                     >
-                      {{ (parseFloat(course.assignment_average) || 0).toFixed(1) }}%
-                    </span>
-                  </td>
-                  <td>
-                    <span 
-                      class="badge" 
-                      :class="getPerformanceBadgeClass(course.quiz_average)"
-                    >
-                      {{ (parseFloat(course.quiz_average) || 0).toFixed(1) }}%
+                      {{ (parseFloat(course.assignment_mark) || 0) }}%
                     </span>
                   </td>
                   <td>
                     <span 
                       class="badge" 
-                      :class="getPerformanceBadgeClass(course.exam_score)"
+                      :class="getPerformanceBadgeClass(course.quiz_mark)"
                     >
-                      {{ (parseFloat(course.exam_score) || 0).toFixed(1) }}%
+                      {{ (parseFloat(course.quiz_mark) || 0) }}%
                     </span>
                   </td>
                   <td>
                     <span 
                       class="badge" 
-                      :class="getOverallPerformanceBadgeClass(course.overall_performance)"
+                      :class="getPerformanceBadgeClass(course.test_mark)"
                     >
-                      {{ course.overall_performance || 'N/A' }}
+                      {{ (parseFloat(course.test_mark) || 0) }}%
+                    </span>
+                  </td>
+                  <td>
+                    <span 
+                      class="badge" 
+                      :class="getPerformanceBadgeClass(course.final_exam_mark)"
+                    >
+                      {{ (parseFloat(course.final_exam_mark) || 0) }}%
+                    </span>
+                  </td>
+                  <td>
+                    <span 
+                      class="badge" 
+                      :class="getOverallPerformanceBadgeClass(getPerformanceLevel(course.overall_percentage))"
+                    >
+                      {{ (parseFloat(course.overall_percentage) || 0).toFixed(1) }}%
                     </span>
                   </td>
                 </tr>
@@ -483,9 +501,45 @@ export default {
     },
     
     getGradePercentage(count) {
-      if (!this.studentData || !this.studentData.grade_distribution) return 0
-      const total = Object.values(this.studentData.grade_distribution).reduce((sum, val) => sum + val, 0)
+      if (!this.studentData || !this.studentData.analytics || !this.studentData.analytics.grade_distribution) return 0
+      const total = Object.values(this.studentData.analytics.grade_distribution).reduce((sum, val) => sum + val, 0)
       return total > 0 ? (count / total) * 100 : 0
+    },
+    
+    getComponentBadgeClass(average) {
+      const score = parseFloat(average) || 0
+      if (score >= 85) return 'bg-success'
+      if (score >= 75) return 'bg-primary' 
+      if (score >= 65) return 'bg-warning'
+      if (score >= 50) return 'bg-orange'
+      return 'bg-danger'
+    },
+    
+    getComponentProgressClass(average) {
+      const score = parseFloat(average) || 0
+      if (score >= 85) return 'bg-success'
+      if (score >= 75) return 'bg-primary'
+      if (score >= 65) return 'bg-warning'
+      if (score >= 50) return 'bg-orange'
+      return 'bg-danger'
+    },
+    
+    getPerformanceText(average) {
+      const score = parseFloat(average) || 0
+      if (score >= 85) return 'Excellent'
+      if (score >= 75) return 'Good'
+      if (score >= 65) return 'Average'
+      if (score >= 50) return 'Needs Improvement'
+      return 'Poor'
+    },
+    
+    getPerformanceLevel(percentage) {
+      const score = parseFloat(percentage) || 0
+      if (score >= 85) return 'excellent'
+      if (score >= 75) return 'good'
+      if (score >= 65) return 'satisfactory'
+      if (score >= 50) return 'needs_improvement'
+      return 'poor'
     },
     
     formatComponentName(component) {
@@ -528,6 +582,15 @@ export default {
         case 'satisfactory': return 'bg-warning'
         case 'needs_improvement': return 'bg-orange'
         case 'poor': return 'bg-danger'
+        default: return 'bg-secondary'
+      }
+    },
+    getPriorityBadgeClass(priority) {
+      switch (priority?.toLowerCase()) {
+        case 'urgent': return 'bg-danger'
+        case 'high': return 'bg-warning'
+        case 'medium': return 'bg-primary'
+        case 'low': return 'bg-success'
         default: return 'bg-secondary'
       }
     },
