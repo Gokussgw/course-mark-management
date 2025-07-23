@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Admin Authentication</title>
+</head>
+<body>
+    <h1>Admin Authentication Test</h1>
+    <div id="results"></div>
+
+    <script>
+    async function testAuth() {
+        const results = document.getElementById('results');
+        
+        // Get token from localStorage (where Vue app stores it)
+        const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+        
+        results.innerHTML += `<p><strong>Token from localStorage:</strong> ${token ? 'Found' : 'Not found'}</p>`;
+        
+        if (token) {
+            results.innerHTML += `<p><strong>Token value:</strong> ${token.substring(0, 50)}...</p>`;
+            
+            // Test stats endpoint
+            try {
+                const response = await fetch('http://localhost:3000/api/admin/stats', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                results.innerHTML += `<p><strong>Stats API Response:</strong> ${response.status} ${response.statusText}</p>`;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    results.innerHTML += `<p><strong>Stats Data:</strong> ${JSON.stringify(data, null, 2)}</p>`;
+                } else {
+                    const errorData = await response.text();
+                    results.innerHTML += `<p><strong>Error:</strong> ${errorData}</p>`;
+                }
+            } catch (error) {
+                results.innerHTML += `<p><strong>Fetch Error:</strong> ${error.message}</p>`;
+            }
+        } else {
+            results.innerHTML += `<p><strong>No token found.</strong> Please login first.</p>`;
+        }
+    }
+    
+    // Run test when page loads
+    testAuth();
+    </script>
+</body>
+</html>

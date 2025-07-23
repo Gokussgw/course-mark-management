@@ -9,6 +9,7 @@ export default {
   getters: {
     isAuthenticated: state => !!state.token,
     getUser: state => state.user,
+    getToken: state => state.token,
     userRole: state => state.user ? state.user.role : null,
     userId: state => state.user ? state.user.id : null
   },

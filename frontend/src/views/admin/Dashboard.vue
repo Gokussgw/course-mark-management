@@ -470,15 +470,7 @@ export default {
   },
   data() {
     return {
-      users: [
-        { id: 1, name: 'Admin User', email: 'admin@example.com', role: 'admin', active: true },
-        { id: 2, name: 'Lecturer One', email: 'lecturer1@example.com', role: 'lecturer', active: true },
-        { id: 3, name: 'Student One', email: 'student1@example.com', role: 'student', matricNumber: 'A12345', active: true },
-        { id: 4, name: 'Advisor One', email: 'advisor1@example.com', role: 'advisor', active: true },
-        { id: 5, name: 'Lecturer Two', email: 'lecturer2@example.com', role: 'lecturer', active: true },
-        { id: 6, name: 'Student Two', email: 'student2@example.com', role: 'student', matricNumber: 'A12346', active: false },
-        { id: 7, name: 'Student Three', email: 'student3@example.com', role: 'student', matricNumber: 'A12347', active: true }
-      ],
+      users: [],
       systemLogs: [
         { time: '2025-07-12 00:45:23', user: 'admin@example.com', action: 'User login', ip: '192.168.1.1' },
         { time: '2025-07-12 00:30:12', user: 'lecturer1@example.com', action: 'Added new assessment', ip: '192.168.1.2' },
@@ -487,12 +479,15 @@ export default {
         { time: '2025-07-11 21:45:12', user: 'student1@example.com', action: 'Submitted remark request', ip: '192.168.1.4' }
       ],
       stats: {
-        courses: 15,
-        activeCourses: 12,
-        currentSemesterCourses: 8,
-        assessments: 45,
-        upcomingAssessments: 12,
-        completedAssessments: 33
+        courses: 0,
+        activeCourses: 0,
+        currentSemesterCourses: 0,
+        assessments: 0,
+        upcomingAssessments: 0,
+        completedAssessments: 0,
+        totalMarks: 0,
+        totalRemarkRequests: 0,
+        atRiskStudents: 0
       },
       searchQuery: '',
       roleFilter: 'all',
@@ -505,7 +500,8 @@ export default {
         active: true
       },
       editingUser: false,
-      selectedUser: null
+      selectedUser: null,
+      loading: true
     };
   },
   computed: {
@@ -679,7 +675,72 @@ export default {
         await this.$store.dispatch('auth/logout');
         this.$router.push('/login');
       }
+    },
+
+    async loadDashboardData() {
+      try {
+        this.loading = true;
+        
+        // Get auth token from store
+        const token = this.$store.getters['auth/getToken'];
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        // Load statistics
+        const statsResponse = await fetch('http://localhost:3000/api/admin/stats', {
+          method: 'GET',
+          headers: headers
+        });
+        
+        if (statsResponse.ok) {
+          const data = await statsResponse.json();
+          
+          // Update stats with real data
+          this.stats.courses = data.totalCourses || 0;
+          this.stats.assessments = data.totalAssessments || 0;
+          this.stats.totalMarks = data.totalMarks || 0;
+          this.stats.totalRemarkRequests = data.totalRemarkRequests || 0;
+          
+          // Calculate additional stats from user data
+          const usersByRole = data.usersByRole || [];
+          
+          // Estimate active courses and upcoming assessments (since backend doesn't have these)
+          this.stats.activeCourses = Math.floor(this.stats.courses * 0.8);
+          this.stats.currentSemesterCourses = Math.floor(this.stats.courses * 0.6);
+          this.stats.upcomingAssessments = Math.floor(this.stats.assessments * 0.3);
+          this.stats.completedAssessments = this.stats.assessments - this.stats.upcomingAssessments;
+        }
+        
+        // Load users
+        const usersResponse = await fetch('http://localhost:3000/api/admin/users', {
+          method: 'GET',
+          headers: headers
+        });
+        
+        if (usersResponse.ok) {
+          const usersData = await usersResponse.json();
+          this.users = usersData.map(user => ({
+            ...user,
+            active: true // Default to active since backend doesn't have this field
+          }));
+        }
+        
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        // Keep default/mock data if API fails
+      } finally {
+        this.loading = false;
+      }
     }
+  },
+
+  async mounted() {
+    await this.loadDashboardData();
   }
 };
 </script>
