@@ -58,7 +58,7 @@
           </ul>
         </div>
         <div class="user-info d-flex align-items-center">
-          <span class="me-3">Welcome, {{ userInfo.name }}</span>
+          <span class="me-3">Welcome, {{ userInfo?.name || 'Advisor' }}</span>
           <button class="btn btn-outline-danger btn-sm" @click="logout">
             <i class="fas fa-sign-out-alt me-1"></i>
             Logout
@@ -575,13 +575,13 @@ export default {
 
     async loadAdvisees() {
       try {
-        const token = this.$store.state.auth.token;
+        const token = localStorage.getItem('token');
         if (!token) {
           throw new Error('No authentication token');
         }
 
         const response = await fetch(
-          `http://localhost:8080/advisor-dashboard-api.php?action=advisees`,
+          `http://localhost:8000/api/advisee-reports/comprehensive`,
           {
             method: "GET",
             headers: {
@@ -593,7 +593,30 @@ export default {
 
         if (response.ok) {
           const data = await response.json();
-          this.advisees = data.advisees || [];
+          if (data.success && data.data.advisees) {
+            // Transform the comprehensive data to match dashboard format
+            this.advisees = data.data.advisees.map(advisee => ({
+              id: advisee.id,
+              name: advisee.name,
+              matric_number: advisee.matric_number,
+              email: advisee.email,
+              status: this.getAcademicStatus(advisee.overall_gpa),
+              gpa: parseFloat(advisee.overall_gpa || 0),
+              risk: this.getRiskLevel(advisee.risk_indicators || []),
+              courses_completed: advisee.completed_courses,
+              total_courses: advisee.total_courses,
+              grade_distribution: {
+                a_grades: advisee.a_grades || 0,
+                b_grades: advisee.b_grades || 0,
+                c_grades: advisee.c_grades || 0,
+                d_grades: advisee.d_grades || 0,
+                f_grades: advisee.f_grades || 0
+              }
+            }));
+          } else {
+            console.error("Invalid API response format");
+            this.advisees = this.adviseesData;
+          }
         } else {
           console.error("Failed to load advisees");
           // Use fallback data
@@ -937,6 +960,24 @@ export default {
         await this.$store.dispatch("auth/logout");
         this.$router.push("/login");
       }
+    },
+
+    // Helper methods for data transformation
+    getAcademicStatus(gpa) {
+      const numericGpa = parseFloat(gpa) || 0;
+      if (numericGpa >= 3.5) return 'Dean\'s List';
+      if (numericGpa >= 3.0) return 'Good Standing';
+      if (numericGpa >= 2.5) return 'Satisfactory';
+      if (numericGpa >= 2.0) return 'Warning';
+      return 'Probation';
+    },
+
+    getRiskLevel(riskIndicators) {
+      const riskCount = Array.isArray(riskIndicators) ? riskIndicators.length : 0;
+      if (riskCount >= 3) return 'High';
+      if (riskCount >= 2) return 'Medium';
+      if (riskCount >= 1) return 'Low';
+      return 'Low';
     },
   },
 };

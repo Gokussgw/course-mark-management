@@ -10,11 +10,15 @@
           <i class="fas fa-arrow-left me-2"></i>
           Back to Reports
         </button>
-        <div v-if="studentData">
-          <h1 class="mb-1">{{ studentData.student_info.name }}</h1>
+        <div v-if="studentData && studentData.student">
+          <h1 class="mb-1">{{ studentData.student.name }}</h1>
           <p class="text-muted mb-0">
-            {{ studentData.student_info.matric_number }} • {{ studentData.student_info.email }}
+            {{ studentData.student.matric_number }} • {{ studentData.student.email }}
           </p>
+        </div>
+        <div v-else-if="!isLoading">
+          <h1 class="mb-1">Student Report</h1>
+          <p class="text-muted mb-0">Loading student information...</p>
         </div>
       </div>
       <div class="d-flex gap-2">
@@ -61,9 +65,9 @@
               <h5 class="card-title text-muted">Overall GPA</h5>
               <h2 
                 class="mb-0" 
-                :class="getGPAColorClass(studentData.performance_summary.overall_gpa)"
+                :class="getGPAColorClass(studentData.student.overall_gpa)"
               >
-                {{ (studentData.performance_summary.overall_gpa || 0).toFixed(2) }}
+                {{ (parseFloat(studentData.student.overall_gpa) || 0).toFixed(2) }}
               </h2>
             </div>
           </div>
@@ -73,7 +77,7 @@
             <div class="card-body">
               <h5 class="card-title text-muted">Courses Completed</h5>
               <h2 class="mb-0 text-primary">
-                {{ studentData.performance_summary.total_courses }}
+                {{ studentData.student.total_courses }}
               </h2>
             </div>
           </div>
@@ -83,7 +87,7 @@
             <div class="card-body">
               <h5 class="card-title text-muted">Credit Hours</h5>
               <h2 class="mb-0 text-info">
-                {{ studentData.performance_summary.total_credit_hours || 0 }}
+                {{ studentData.student.completed_courses || 0 }}
               </h2>
             </div>
           </div>
@@ -95,10 +99,10 @@
               <h5 class="mb-0">
                 <span 
                   class="badge" 
-                  :class="getTrendBadgeClass(studentData.performance_summary.performance_trend)"
+                  :class="getTrendBadgeClass(getOverallTrend())"
                 >
-                  <i :class="getTrendIcon(studentData.performance_summary.performance_trend)" class="me-1"></i>
-                  {{ getTrendText(studentData.performance_summary.performance_trend) }}
+                  <i :class="getTrendIcon(getOverallTrend())" class="me-1"></i>
+                  {{ getTrendText(getOverallTrend()) }}
                 </span>
               </h5>
             </div>
@@ -221,7 +225,7 @@
                       class="badge" 
                       :class="getStrengthBadgeClass(strength.performance)"
                     >
-                      {{ (strength.average || 0).toFixed(1) }}%
+                      {{ (parseFloat(strength.average) || 0).toFixed(1) }}%
                     </span>
                   </div>
                   <div class="progress">
@@ -279,13 +283,13 @@
                       {{ course.final_grade || 'N/A' }}
                     </span>
                   </td>
-                  <td>{{ (course.grade_point || 0).toFixed(2) }}</td>
+                  <td>{{ (parseFloat(course.grade_point) || 0).toFixed(2) }}</td>
                   <td>
                     <span 
                       class="badge" 
                       :class="getPerformanceBadgeClass(course.assignment_average)"
                     >
-                      {{ (course.assignment_average || 0).toFixed(1) }}%
+                      {{ (parseFloat(course.assignment_average) || 0).toFixed(1) }}%
                     </span>
                   </td>
                   <td>
@@ -293,7 +297,7 @@
                       class="badge" 
                       :class="getPerformanceBadgeClass(course.quiz_average)"
                     >
-                      {{ (course.quiz_average || 0).toFixed(1) }}%
+                      {{ (parseFloat(course.quiz_average) || 0).toFixed(1) }}%
                     </span>
                   </td>
                   <td>
@@ -301,7 +305,7 @@
                       class="badge" 
                       :class="getPerformanceBadgeClass(course.exam_score)"
                     >
-                      {{ (course.exam_score || 0).toFixed(1) }}%
+                      {{ (parseFloat(course.exam_score) || 0).toFixed(1) }}%
                     </span>
                   </td>
                   <td>
@@ -390,7 +394,7 @@ export default {
         const a = document.createElement('a')
         a.style.display = 'none'
         a.href = url
-        a.download = `${this.studentData.student_info.name}_report_${new Date().toISOString().split('T')[0]}.csv`
+        a.download = `${this.studentData.student.name}_report_${new Date().toISOString().split('T')[0]}.csv`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
@@ -402,11 +406,11 @@ export default {
     },
     
     getGPAColorClass(gpa) {
-      if (!gpa) return 'text-secondary'
-      if (gpa >= 3.5) return 'text-success'
-      if (gpa >= 3.0) return 'text-primary'
-      if (gpa >= 2.5) return 'text-warning'
-      if (gpa >= 2.0) return 'text-orange'
+      const numericGpa = parseFloat(gpa) || 0
+      if (numericGpa >= 3.5) return 'text-success'
+      if (numericGpa >= 3.0) return 'text-primary'
+      if (numericGpa >= 2.5) return 'text-warning'
+      if (numericGpa >= 2.0) return 'text-orange'
       return 'text-danger'
     },
     
@@ -526,6 +530,25 @@ export default {
         case 'poor': return 'bg-danger'
         default: return 'bg-secondary'
       }
+    },
+    
+    getOverallTrend() {
+      if (!this.studentData || !this.studentData.analytics || !this.studentData.analytics.performance_trend) {
+        return 'insufficient_data'
+      }
+      
+      const trendData = this.studentData.analytics.performance_trend
+      if (Array.isArray(trendData) && trendData.length >= 2) {
+        const firstScore = parseFloat(trendData[0].percentage) || 0
+        const lastScore = parseFloat(trendData[trendData.length - 1].percentage) || 0
+        const diff = lastScore - firstScore
+        
+        if (diff > 5) return 'improving'
+        if (diff < -5) return 'declining'
+        return 'stable'
+      }
+      
+      return 'insufficient_data'
     }
   }
 }

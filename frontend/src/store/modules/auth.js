@@ -29,8 +29,8 @@ export default {
       try {
         dispatch('setLoading', true, { root: true });
         
-        // Use the proper auth endpoint
-        const response = await axios.post('/api/auth/login', {
+        // Use the proper auth endpoint with correct backend port
+        const response = await axios.post('http://localhost:8000/api/auth/login', {
           email: credentials.email,
           password: credentials.password
         });
@@ -67,7 +67,7 @@ export default {
     async register({ dispatch }, userData) {
       try {
         dispatch('setLoading', true, { root: true });
-        const response = await axios.post('/api/auth/register', userData);
+        const response = await axios.post('http://localhost:8000/api/auth/register', userData);
         return response.data;
       } catch (error) {
         const errorMsg = error.response?.data?.error || 'Registration failed';
@@ -78,13 +78,21 @@ export default {
       }
     },
     
-    logout({ commit }) {
-      // Clear localStorage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      
-      // Update state
-      commit('CLEAR_AUTH');
+    async logout({ commit }) {
+      try {
+        // Clear localStorage first
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Update state
+        commit('CLEAR_AUTH');
+        
+        console.log('Logout successful'); // Debug log
+      } catch (error) {
+        console.error('Error during logout:', error);
+        // Even if there's an error, clear the auth state
+        commit('CLEAR_AUTH');
+      }
     },
     
     checkAuth({ commit }) {

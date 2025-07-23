@@ -64,7 +64,7 @@
               <div class="d-flex justify-content-between">
                 <div>
                   <h6 class="card-title">Average GPA</h6>
-                  <h3 class="mb-0">{{ reportsData.summary.avg_gpa.toFixed(2) }}</h3>
+                  <h3 class="mb-0">{{ (parseFloat(reportsData.summary.avg_gpa) || 0).toFixed(2) }}</h3>
                 </div>
                 <div class="align-self-center">
                   <i class="fas fa-chart-line fa-2x opacity-75"></i>
@@ -187,7 +187,7 @@
                       class="badge fs-6" 
                       :class="getGPABadgeClass(advisee.overall_gpa)"
                     >
-                      {{ (advisee.overall_gpa || 0).toFixed(2) }}
+                      {{ (parseFloat(advisee.overall_gpa) || 0).toFixed(2) }}
                     </span>
                   </td>
                   <td>
@@ -443,11 +443,11 @@ export default {
     },
     
     getGPABadgeClass(gpa) {
-      if (!gpa) return 'bg-secondary'
-      if (gpa >= 3.5) return 'bg-success'
-      if (gpa >= 3.0) return 'bg-primary'
-      if (gpa >= 2.5) return 'bg-warning'
-      if (gpa >= 2.0) return 'bg-orange'
+      const numericGpa = parseFloat(gpa) || 0
+      if (numericGpa >= 3.5) return 'bg-success'
+      if (numericGpa >= 3.0) return 'bg-primary'
+      if (numericGpa >= 2.5) return 'bg-warning'
+      if (numericGpa >= 2.0) return 'bg-orange'
       return 'bg-danger'
     },
     
@@ -558,5 +558,28 @@ export default {
     flex-direction: column;
     gap: 0.5rem !important;
   }
+}
+
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1040;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000;
+  opacity: 0.5;
+}
+
+.modal {
+  z-index: 1050;
+}
+
+.modal.show {
+  opacity: 1;
+}
+
+.modal-backdrop.show {
+  opacity: 0.5;
 }
 </style>

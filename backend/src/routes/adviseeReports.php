@@ -8,16 +8,70 @@ $app->group('/api/advisee-reports', function ($group) {
 
     // Get comprehensive advisee reports for an advisor
     $group->get('/comprehensive', function (Request $request, Response $response) {
-        $user = $request->getAttribute('user');
+        // Apply JWT authentication manually
+        $authHeader = $request->getHeaderLine('Authorization');
+
+        if (empty($authHeader)) {
+            $response->getBody()->write(json_encode(['error' => 'Authorization token required']));
+            return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+        }
+
+        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+            $token = $matches[1];
+
+            try {
+                $jwtSecret = $_ENV['JWT_SECRET'] ?? 'your_jwt_secret_key_here';
+                $decoded = \Firebase\JWT\JWT::decode($token, new \Firebase\JWT\Key($jwtSecret, 'HS256'));
+
+                // Add user info to request attributes
+                $user = $decoded;
+            } catch (\Firebase\JWT\ExpiredException $e) {
+                $response->getBody()->write(json_encode(['error' => 'Token expired']));
+                return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+            } catch (\Exception $e) {
+                $response->getBody()->write(json_encode(['error' => 'Invalid token']));
+                return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+            }
+        } else {
+            $response->getBody()->write(json_encode(['error' => 'Invalid authorization header format']));
+            return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+        }
+        
         $pdo = $this->get('pdo');
         
-        if (!$user || $user->role !== 'advisor') {
-            $response->getBody()->write(json_encode(['error' => 'Advisor access required']));
+        // Debug: Let's see what user data we have
+        error_log('User attribute in advisee reports: ' . print_r($user, true));
+        
+        if (!$user) {
+            $response->getBody()->write(json_encode(['error' => 'User not authenticated', 'debug' => 'No user attribute found']));
+            return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+        }
+        
+        if ($user->role !== 'advisor') {
+            $response->getBody()->write(json_encode(['error' => 'Advisor access required', 'current_role' => $user->role ?? 'undefined']));
             return $response->withStatus(403)->withHeader('Content-Type', 'application/json');
         }
 
         try {
             $advisorId = $user->id;
+            
+            // Debug: Log the advisor ID and user info
+            error_log('Debug - Advisor ID: ' . $advisorId);
+            error_log('Debug - User object: ' . print_r($user, true));
+            
+            // First, let's check if we can find advisees at all
+            $stmt = $pdo->prepare('
+                SELECT u.id, u.name, u.email, u.advisor_id 
+                FROM users u 
+                WHERE u.role = "student" AND u.advisor_id = ?
+            ');
+            $stmt->execute([$advisorId]);
+            $basicAdvisees = $stmt->fetchAll();
+            
+            error_log('Debug - Basic advisees count: ' . count($basicAdvisees));
+            
+            // If we have basic advisees, continue with the complex query
+            if (count($basicAdvisees) > 0) {
 
             // Get all advisees with their comprehensive academic information
             $stmt = $pdo->prepare('
@@ -30,30 +84,10 @@ $app->group('/api/advisee-reports', function ($group) {
                     COUNT(DISTINCT e.course_id) as total_courses,
                     COUNT(DISTINCT fm.id) as completed_courses,
                     AVG(fm.gpa) as overall_gpa,
-                    AVG(
-                        CASE 
-                            WHEN fm.assignment_mark IS NOT NULL AND fm.assignment_max IS NOT NULL 
-                            THEN (fm.assignment_mark / fm.assignment_max) * 100 
-                        END
-                    ) as avg_assignment_percentage,
-                    AVG(
-                        CASE 
-                            WHEN fm.quiz_mark IS NOT NULL AND fm.quiz_max IS NOT NULL 
-                            THEN (fm.quiz_mark / fm.quiz_max) * 100 
-                        END
-                    ) as avg_quiz_percentage,
-                    AVG(
-                        CASE 
-                            WHEN fm.test_mark IS NOT NULL AND fm.test_max IS NOT NULL 
-                            THEN (fm.test_mark / fm.test_max) * 100 
-                        END
-                    ) as avg_test_percentage,
-                    AVG(
-                        CASE 
-                            WHEN fm.final_exam_mark IS NOT NULL AND fm.final_exam_max IS NOT NULL 
-                            THEN (fm.final_exam_mark / fm.final_exam_max) * 100 
-                        END
-                    ) as avg_final_exam_percentage,
+                    AVG(fm.assignment_percentage) as avg_assignment_percentage,
+                    AVG(fm.quiz_percentage) as avg_quiz_percentage,
+                    AVG(fm.test_percentage) as avg_test_percentage,
+                    AVG(fm.final_exam_percentage) as avg_final_exam_percentage,
                     COUNT(CASE WHEN fm.letter_grade IN ("A+", "A", "A-") THEN 1 END) as a_grades,
                     COUNT(CASE WHEN fm.letter_grade IN ("B+", "B", "B-") THEN 1 END) as b_grades,
                     COUNT(CASE WHEN fm.letter_grade IN ("C+", "C", "C-") THEN 1 END) as c_grades,
@@ -74,10 +108,10 @@ $app->group('/api/advisee-reports', function ($group) {
                 // Get course details for trend calculation
                 $stmt = $pdo->prepare('
                     SELECT 
-                        fm.overall_percentage,
+                        fm.final_grade as overall_percentage,
                         fm.created_at
                     FROM final_marks_custom fm
-                    WHERE fm.student_id = ? AND fm.overall_percentage IS NOT NULL
+                    WHERE fm.student_id = ? AND fm.final_grade IS NOT NULL
                     ORDER BY fm.created_at
                 ');
                 $stmt->execute([$advisee['id']]);
@@ -114,6 +148,23 @@ $app->group('/api/advisee-reports', function ($group) {
                     ]
                 ]
             ]));
+            
+            } else {
+                // No advisees found
+                $response->getBody()->write(json_encode([
+                    'success' => true,
+                    'data' => [
+                        'advisees' => [],
+                        'summary' => [
+                            'total_advisees' => 0,
+                            'avg_gpa' => 0,
+                            'at_risk_count' => 0,
+                            'excellent_performers' => 0
+                        ]
+                    ]
+                ]));
+            }
+            
             return $response->withHeader('Content-Type', 'application/json');
 
         } catch (Exception $e) {
@@ -125,7 +176,33 @@ $app->group('/api/advisee-reports', function ($group) {
 
     // Get individual advisee detailed report
     $group->get('/individual/{studentId}', function (Request $request, Response $response, array $args) {
-        $user = $request->getAttribute('user');
+        // Apply JWT authentication manually
+        $authHeader = $request->getHeaderLine('Authorization');
+
+        if (empty($authHeader)) {
+            $response->getBody()->write(json_encode(['error' => 'Authorization token required']));
+            return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+        }
+
+        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+            $token = $matches[1];
+
+            try {
+                $jwtSecret = $_ENV['JWT_SECRET'] ?? 'your_jwt_secret_key_here';
+                $decoded = \Firebase\JWT\JWT::decode($token, new \Firebase\JWT\Key($jwtSecret, 'HS256'));
+                $user = $decoded;
+            } catch (\Firebase\JWT\ExpiredException $e) {
+                $response->getBody()->write(json_encode(['error' => 'Token expired']));
+                return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+            } catch (\Exception $e) {
+                $response->getBody()->write(json_encode(['error' => 'Invalid token']));
+                return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+            }
+        } else {
+            $response->getBody()->write(json_encode(['error' => 'Invalid authorization header format']));
+            return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+        }
+        
         $pdo = $this->get('pdo');
         
         if (!$user || $user->role !== 'advisor') {
@@ -176,25 +253,21 @@ $app->group('/api/advisee-reports', function ($group) {
                     c.id,
                     c.code,
                     c.name,
-                    c.credits,
-                    c.description,
+                    c.lecturer_id,
+                    c.semester,
+                    c.academic_year,
                     fm.assignment_mark,
-                    fm.assignment_max,
+                    fm.assignment_percentage,
                     fm.quiz_mark,
-                    fm.quiz_max,
+                    fm.quiz_percentage,
                     fm.test_mark,
-                    fm.test_max,
+                    fm.test_percentage,
                     fm.final_exam_mark,
-                    fm.final_exam_max,
-                    fm.total_marks,
-                    fm.max_marks,
-                    fm.overall_percentage,
+                    fm.final_exam_percentage,
+                    fm.component_total,
+                    fm.final_grade as overall_percentage,
                     fm.letter_grade,
                     fm.gpa,
-                    fm.assignment_weightage,
-                    fm.quiz_weightage,
-                    fm.test_weightage,
-                    fm.final_exam_weightage,
                     fm.created_at as completion_date
                 FROM enrollments e
                 JOIN courses c ON e.course_id = c.id
@@ -249,7 +322,33 @@ $app->group('/api/advisee-reports', function ($group) {
 
     // Export advisee reports to CSV
     $group->get('/export/csv', function (Request $request, Response $response) {
-        $user = $request->getAttribute('user');
+        // Apply JWT authentication manually
+        $authHeader = $request->getHeaderLine('Authorization');
+
+        if (empty($authHeader)) {
+            $response->getBody()->write(json_encode(['error' => 'Authorization token required']));
+            return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+        }
+
+        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+            $token = $matches[1];
+
+            try {
+                $jwtSecret = $_ENV['JWT_SECRET'] ?? 'your_jwt_secret_key_here';
+                $decoded = \Firebase\JWT\JWT::decode($token, new \Firebase\JWT\Key($jwtSecret, 'HS256'));
+                $user = $decoded;
+            } catch (\Firebase\JWT\ExpiredException $e) {
+                $response->getBody()->write(json_encode(['error' => 'Token expired']));
+                return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+            } catch (\Exception $e) {
+                $response->getBody()->write(json_encode(['error' => 'Invalid token']));
+                return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+            }
+        } else {
+            $response->getBody()->write(json_encode(['error' => 'Invalid authorization header format']));
+            return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+        }
+        
         $pdo = $this->get('pdo');
         
         if (!$user || $user->role !== 'advisor') {
@@ -269,7 +368,7 @@ $app->group('/api/advisee-reports', function ($group) {
                     COUNT(DISTINCT e.course_id) as "Total Courses",
                     COUNT(DISTINCT fm.id) as "Completed Courses",
                     ROUND(AVG(fm.gpa), 2) as "Overall GPA",
-                    ROUND(AVG(fm.overall_percentage), 2) as "Average Percentage",
+                    ROUND(AVG(fm.final_grade), 2) as "Average Percentage",
                     COUNT(CASE WHEN fm.letter_grade IN ("A+", "A", "A-") THEN 1 END) as "A Grades",
                     COUNT(CASE WHEN fm.letter_grade IN ("B+", "B", "B-") THEN 1 END) as "B Grades",
                     COUNT(CASE WHEN fm.letter_grade IN ("C+", "C", "C-") THEN 1 END) as "C Grades",
@@ -416,17 +515,16 @@ function analyzeComponentStrengths($courses) {
     $strengths = [];
     
     foreach ($components as $component) {
-        $marks = [];
+        $percentages = [];
         foreach ($courses as $course) {
-            $mark = $course[$component . '_mark'];
-            $max = $course[$component . '_max'];
-            if ($mark !== null && $max !== null && $max > 0) {
-                $marks[] = ($mark / $max) * 100;
+            $percentage = $course[$component . '_percentage'];
+            if ($percentage !== null && $percentage > 0) {
+                $percentages[] = (float)$percentage;
             }
         }
         
-        if (!empty($marks)) {
-            $avg = array_sum($marks) / count($marks);
+        if (!empty($percentages)) {
+            $avg = array_sum($percentages) / count($percentages);
             $strengths[$component] = round($avg, 2);
         }
     }
