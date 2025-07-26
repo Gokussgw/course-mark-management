@@ -18,4 +18,3 @@ foreach ($users as $user) {
 echo "\nYou can now log in with:\n";
 echo "Admin: admin@example.com / admin123\n";
 echo "Lecturer: lecturer1@example.com / lecturer123\n";
-?>

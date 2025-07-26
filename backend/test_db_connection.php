@@ -2,7 +2,7 @@
 try {
     $pdo = new PDO('mysql:host=localhost;dbname=course_mark_management', 'root', '');
     echo "Database connection successful\n";
-    
+
     // Test if we can get student 15's data
     $stmt = $pdo->prepare("SELECT id, name, advisor_id, role FROM users WHERE id = 15");
     $stmt->execute();
@@ -12,20 +12,20 @@ try {
     } else {
         echo "Student 15 not found\n";
     }
-    
+
     $stmt = $pdo->prepare("SELECT id, student_id, course_id, gpa, final_grade FROM final_marks_custom WHERE student_id = 15 LIMIT 5");
     $stmt->execute();
     $results = $stmt->fetchAll();
     echo "Found " . count($results) . " final marks for student 15\n";
-    
+
     foreach ($results as $row) {
         echo "Course " . $row['course_id'] . ": GPA = " . $row['gpa'] . ", Final Grade = " . $row['final_grade'] . "\n";
     }
-    
+
     // Test the advisor query
     if ($user && $user['advisor_id']) {
         echo "\nTesting NEW advisor query for advisor ID: {$user['advisor_id']}\n";
-        
+
         $stmt = $pdo->prepare("
             SELECT 
                 u.id,
@@ -64,8 +64,6 @@ try {
             echo "No advisee data found\n";
         }
     }
-    
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";
 }
-?>

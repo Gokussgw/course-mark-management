@@ -5,4 +5,3 @@ echo "Users in database:\n";
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     echo "ID: {$row['id']}, Name: {$row['name']}, Email: {$row['email']}, Role: {$row['role']}\n";
 }
-?>

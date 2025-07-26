@@ -10,4 +10,3 @@ echo "Updated password for lecturer1@example.com to 'password'\n";
 echo "\nYou can now log in with:\n";
 echo "Lecturer: lecturer1@example.com / password\n";
 echo "Admin: admin@example.com / admin123\n";
-?>

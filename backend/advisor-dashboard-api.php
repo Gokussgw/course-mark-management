@@ -168,7 +168,7 @@ function getAdviseeCourses($pdo, $user)
     try {
         $advisorId = $user['id'];
         $studentId = $_GET['student_id'] ?? null;
-        
+
         if (!$studentId) {
             http_response_code(400);
             echo json_encode(['error' => 'student_id parameter required']);
@@ -229,7 +229,7 @@ function getAdviseeCourses($pdo, $user)
             $course['credits'] = (int)$course['credits'];
             $course['total_assessments'] = (int)$course['total_assessments'];
             $course['completed_assessments'] = (int)$course['completed_assessments'];
-            $course['progress'] = $course['total_assessments'] > 0 
+            $course['progress'] = $course['total_assessments'] > 0
                 ? round(($course['completed_assessments'] / $course['total_assessments']) * 100, 1)
                 : 0;
         }

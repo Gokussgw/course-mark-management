@@ -4,7 +4,7 @@ $pdo = new PDO('mysql:host=localhost;dbname=course_mark_management', 'root', '')
 
 $courseData = [
     'code' => 'CS101',
-    'name' => 'Introduction to Computer Science', 
+    'name' => 'Introduction to Computer Science',
     'lecturer_id' => 2, // lecturer1@example.com
     'semester' => 'Fall',
     'academic_year' => '2025-2026'
@@ -23,15 +23,15 @@ if ($stmt->fetch()) {
     ');
     $stmt->execute([
         $courseData['code'],
-        $courseData['name'], 
+        $courseData['name'],
         $courseData['lecturer_id'],
         $courseData['semester'],
         $courseData['academic_year']
     ]);
-    
+
     $courseId = $pdo->lastInsertId();
     echo "Created course {$courseData['code']} with ID: $courseId\n";
-    
+
     // Add some student enrollments
     $students = [10, 11, 12, 13]; // Student IDs from our database
     foreach ($students as $studentId) {
@@ -41,7 +41,6 @@ if ($stmt->fetch()) {
         ');
         $stmt->execute([$studentId, $courseId, $courseData['academic_year'], $courseData['semester']]);
     }
-    
+
     echo "Enrolled " . count($students) . " students in the course\n";
 }
-?>
