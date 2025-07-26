@@ -269,7 +269,7 @@ $app->group('/api/comparisons', function ($group) {
             return $response->withStatus(500)->withHeader('Content-Type', 'application/json');
         }
     });
-});
+})->add(new JwtMiddleware($container));
 
 // Helper function to calculate percentiles
 function calculatePercentile($data, $percentile)

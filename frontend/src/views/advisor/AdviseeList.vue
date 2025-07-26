@@ -29,10 +29,22 @@
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
+      <p class="mt-2">Loading your advisees...</p>
     </div>
 
-    <div v-else-if="filteredAdvisees.length === 0" class="alert alert-info">
-      No advisees found.
+    <div v-else-if="error" class="alert alert-danger">
+      <i class="fas fa-exclamation-triangle me-2"></i>
+      {{ error }}
+    </div>
+
+    <div v-else-if="filteredAdvisees.length === 0 && advisees.length === 0" class="alert alert-info">
+      <i class="fas fa-info-circle me-2"></i>
+      No advisees have been assigned to you yet.
+    </div>
+
+    <div v-else-if="filteredAdvisees.length === 0" class="alert alert-warning">
+      <i class="fas fa-search me-2"></i>
+      No advisees match your current search criteria.
     </div>
 
     <div v-else class="row">
@@ -75,20 +87,23 @@ export default {
     return {
       searchQuery: '',
       programFilter: '',
-      loading: true
+      loading: true,
+      error: null
     }
   },
   computed: {
     ...mapState('users', ['advisees']),
     programs() {
       // Extract unique programs from advisees
-      return [...new Set(this.advisees.map(advisee => advisee.program))];
+      if (!this.advisees || !Array.isArray(this.advisees)) return [];
+      return [...new Set(this.advisees.map(advisee => advisee.program).filter(Boolean))];
     },
     filteredAdvisees() {
+      if (!this.advisees || !Array.isArray(this.advisees)) return [];
       return this.advisees.filter(advisee => {
-        const matchesSearch = advisee.fullName.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-          advisee.studentId.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-          advisee.email.toLowerCase().includes(this.searchQuery.toLowerCase());
+        const matchesSearch = advisee.fullName?.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+          advisee.studentId?.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+          advisee.email?.toLowerCase().includes(this.searchQuery.toLowerCase());
         
         const matchesProgram = this.programFilter === '' || advisee.program === this.programFilter;
         
@@ -101,10 +116,12 @@ export default {
   },
   async created() {
     try {
+      this.loading = true;
+      this.error = null;
       await this.fetchAdvisees();
     } catch (error) {
-      this.$toast.error('Failed to load advisees.');
       console.error('Error fetching advisees:', error);
+      this.error = error.message || 'Failed to load advisees. Please try again.';
     } finally {
       this.loading = false;
     }

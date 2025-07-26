@@ -88,6 +88,9 @@ switch ($action) {
             deleteNote($pdo, $user);
         }
         break;
+    case 'advisee_courses':
+        getAdviseeCourses($pdo, $user);
+        break;
     case 'advisor_stats':
         getAdvisorStats($pdo, $user);
         break;
@@ -116,48 +119,21 @@ function getAdvisees($pdo, $user)
                 u.email,
                 u.matric_number,
                 u.created_at,
-                COALESCE(AVG(
-                    CASE 
-                        WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                        ELSE 0 
-                    END
-                ), 0) as gpa,
-                COUNT(DISTINCT c.id) as enrolled_courses,
+                COALESCE(AVG(fm.gpa), 0) as gpa,
+                COUNT(DISTINCT fm.course_id) as enrolled_courses,
+                COUNT(DISTINCT fm.id) as completed_credits,
                 CASE 
-                    WHEN COALESCE(AVG(
-                        CASE 
-                            WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                            ELSE 0 
-                        END
-                    ), 0) < 50 THEN 'High'
-                    WHEN COALESCE(AVG(
-                        CASE 
-                            WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                            ELSE 0 
-                        END
-                    ), 0) < 65 THEN 'Medium'
+                    WHEN COALESCE(AVG(fm.final_grade), 0) < 50 THEN 'High'
+                    WHEN COALESCE(AVG(fm.final_grade), 0) < 65 THEN 'Medium'
                     ELSE 'Low'
                 END as risk,
                 CASE 
-                    WHEN COALESCE(AVG(
-                        CASE 
-                            WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                            ELSE 0 
-                        END
-                    ), 0) >= 70 THEN 'Good Standing'
-                    WHEN COALESCE(AVG(
-                        CASE 
-                            WHEN a.max_mark > 0 THEN (m.mark / a.max_mark) * 100 
-                            ELSE 0 
-                        END
-                    ), 0) >= 50 THEN 'Warning'
+                    WHEN COALESCE(AVG(fm.gpa), 0) >= 3.0 THEN 'Good Standing'
+                    WHEN COALESCE(AVG(fm.gpa), 0) >= 2.0 THEN 'Warning'
                     ELSE 'Probation'
                 END as status
             FROM users u
-            LEFT JOIN enrollments e ON u.id = e.student_id
-            LEFT JOIN courses c ON e.course_id = c.id
-            LEFT JOIN assessments a ON c.id = a.course_id
-            LEFT JOIN marks m ON u.id = m.student_id AND a.id = m.assessment_id
+            LEFT JOIN final_marks_custom fm ON u.id = fm.student_id
             WHERE u.advisor_id = ? AND u.role = 'student'
             GROUP BY u.id, u.name, u.email, u.matric_number, u.created_at
             ORDER BY u.name
@@ -170,12 +146,100 @@ function getAdvisees($pdo, $user)
         foreach ($advisees as &$advisee) {
             $advisee['gpa'] = round($advisee['gpa'], 2);
             $advisee['enrolled_courses'] = (int)$advisee['enrolled_courses'];
+            $advisee['completed_credits'] = (int)$advisee['completed_credits'];
         }
 
         echo json_encode(['advisees' => $advisees]);
     } catch (Exception $e) {
         http_response_code(500);
         echo json_encode(['error' => 'Failed to get advisees: ' . $e->getMessage()]);
+    }
+}
+
+// Get courses for a specific advisee
+function getAdviseeCourses($pdo, $user)
+{
+    if (!$user || $user['role'] !== 'advisor') {
+        http_response_code(401);
+        echo json_encode(['error' => 'Advisor access required']);
+        return;
+    }
+
+    try {
+        $advisorId = $user['id'];
+        $studentId = $_GET['student_id'] ?? null;
+        
+        if (!$studentId) {
+            http_response_code(400);
+            echo json_encode(['error' => 'student_id parameter required']);
+            return;
+        }
+
+        // Verify the student is under this advisor
+        $stmt = $pdo->prepare('SELECT id FROM users WHERE id = ? AND advisor_id = ? AND role = "student"');
+        $stmt->execute([$studentId, $advisorId]);
+        if (!$stmt->fetch()) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Student not under your advisory']);
+            return;
+        }
+
+        // Get detailed course information for the student
+        $stmt = $pdo->prepare("
+            SELECT 
+                c.id,
+                c.code,
+                c.name,
+                c.semester,
+                c.academic_year,
+                3 as credits,
+                u.name as lecturer_name,
+                e.created_at as enrolled_at,
+                COALESCE(AVG(
+                    CASE 
+                        WHEN fm.final_grade IS NOT NULL THEN fm.final_grade
+                        ELSE NULL
+                    END
+                ), 0) as current_grade,
+                CASE 
+                    WHEN COALESCE(AVG(fm.final_grade), 0) >= 70 THEN 'Good'
+                    WHEN COALESCE(AVG(fm.final_grade), 0) >= 50 THEN 'Satisfactory'
+                    WHEN COALESCE(AVG(fm.final_grade), 0) > 0 THEN 'At Risk'
+                    ELSE 'No Grade'
+                END as status,
+                COUNT(DISTINCT a.id) as total_assessments,
+                COUNT(DISTINCT m.id) as completed_assessments
+            FROM enrollments e 
+            JOIN courses c ON e.course_id = c.id 
+            LEFT JOIN users u ON c.lecturer_id = u.id
+            LEFT JOIN final_marks_custom fm ON c.id = fm.course_id AND e.student_id = fm.student_id
+            LEFT JOIN assessments a ON c.id = a.course_id
+            LEFT JOIN marks m ON a.id = m.assessment_id AND e.student_id = m.student_id
+            WHERE e.student_id = ?
+            GROUP BY c.id, c.code, c.name, c.semester, c.academic_year, u.name, e.created_at
+            ORDER BY c.code
+        ");
+
+        $stmt->execute([$studentId]);
+        $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Format the data
+        foreach ($courses as &$course) {
+            $course['current_grade'] = round($course['current_grade'], 2);
+            $course['credits'] = (int)$course['credits'];
+            $course['total_assessments'] = (int)$course['total_assessments'];
+            $course['completed_assessments'] = (int)$course['completed_assessments'];
+            $course['progress'] = $course['total_assessments'] > 0 
+                ? round(($course['completed_assessments'] / $course['total_assessments']) * 100, 1)
+                : 0;
+        }
+
+        echo json_encode(['courses' => $courses]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        error_log("Error in getAdviseeCourses: " . $e->getMessage());
+        error_log("Error trace: " . $e->getTraceAsString());
+        echo json_encode(['error' => 'Failed to get advisee courses: ' . $e->getMessage()]);
     }
 }
 

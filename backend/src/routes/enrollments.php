@@ -129,8 +129,8 @@ $app->post('/api/courses/{courseId}/enroll', function (Request $request, Respons
 
         // Insert enrollment
         $stmt = $db->prepare("
-            INSERT INTO enrollments (course_id, student_id, academic_year, semester, enrolled_at) 
-            VALUES (?, ?, ?, ?, NOW())
+            INSERT INTO enrollments (course_id, student_id, academic_year, semester) 
+            VALUES (?, ?, ?, ?)
         ");
 
         $result = $stmt->execute([$courseId, $studentId, $academicYear, $semester]);

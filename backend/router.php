@@ -64,6 +64,11 @@ if ($path === '/breakdown-api.php' && file_exists(__DIR__ . '/breakdown-api.php'
     return;
 }
 
+if ($path === '/advisor-dashboard-api.php' && file_exists(__DIR__ . '/advisor-dashboard-api.php')) {
+    include __DIR__ . '/advisor-dashboard-api.php';
+    return;
+}
+
 if ($path === '/ranking-api.php' && file_exists(__DIR__ . '/ranking-api.php')) {
     include __DIR__ . '/ranking-api.php';
     return;

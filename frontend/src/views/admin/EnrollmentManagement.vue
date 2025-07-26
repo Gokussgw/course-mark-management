@@ -457,6 +457,7 @@
 <script>
 import { mapGetters } from 'vuex';
 import * as bootstrap from 'bootstrap';
+import axios from 'axios';
 
 export default {
   name: 'AdminEnrollmentManagement',
@@ -533,7 +534,7 @@ export default {
   async created() {
     // Load any previously transferred students from localStorage
     this.loadTransferredStudents();
-    await this.loadTemporaryData();
+    await this.loadInitialData();
   },
   methods: {
     async loadTemporaryData() {
@@ -671,79 +672,26 @@ export default {
       try {
         console.log('Loading enrollments for course:', this.selectedCourseId);
         
-        // Load temporary course enrollments based on selected course
-        if (this.selectedCourseId == 1) {
-          this.currentCourseEnrollments = [
-            {
-              enrollment_id: 1,
-              student_id: 4,
-              student_name: 'Student One',
-              student_email: 'student1@example.com',
-              matric_number: 'S123456',
-              academic_year: '2025-2026',
-              semester: 'Fall',
-              enrolled_at: '2025-01-15'
-            },
-            {
-              enrollment_id: 2,
-              student_id: 5,
-              student_name: 'Student Two',
-              student_email: 'student2@example.com',
-              matric_number: 'S123457',
-              academic_year: '2025-2026',
-              semester: 'Fall',
-              enrolled_at: '2025-01-16'
-            }
-          ];
-          
-          console.log('Set enrollments for CS101:', this.currentCourseEnrollments);
-          
-          // Set available students for this course
-          this.$store.commit('enrollments/SET_AVAILABLE_STUDENTS', [
-            {
-              id: 6,
-              name: 'Student Three',
-              email: 'student3@example.com',
-              matric_number: 'S123458',
-              enrollment_count: 0
-            }
-          ]);
-        } else if (this.selectedCourseId == 2) {
-          this.currentCourseEnrollments = [
-            {
-              enrollment_id: 3,
-              student_id: 5,
-              student_name: 'Student Two',
-              student_email: 'student2@example.com',
-              matric_number: 'S123457',
-              academic_year: '2025-2026',
-              semester: 'Fall',
-              enrolled_at: '2025-01-17'
-            }
-          ];
-          
-          console.log('Set enrollments for CS201:', this.currentCourseEnrollments);
-          
-          // Set available students for this course
-          this.$store.commit('enrollments/SET_AVAILABLE_STUDENTS', [
-            {
-              id: 4,
-              name: 'Student One',
-              email: 'student1@example.com',
-              matric_number: 'S123456',
-              enrollment_count: 1
-            },
-            {
-              id: 6,
-              name: 'Student Three',
-              email: 'student3@example.com',
-              matric_number: 'S123458',
-              enrollment_count: 0
-            }
-          ]);
+        // Load real course enrollments from API
+        const enrollmentsResponse = await axios.get(`/api/courses/${this.selectedCourseId}/enrollments`);
+        
+        if (enrollmentsResponse.data.success) {
+          this.currentCourseEnrollments = enrollmentsResponse.data.data;
+          console.log('Loaded enrollments:', this.currentCourseEnrollments);
         } else {
+          console.error('Failed to load enrollments:', enrollmentsResponse.data.message);
           this.currentCourseEnrollments = [];
-          console.log('No enrollments for course:', this.selectedCourseId);
+        }
+        
+        // Load available students for this course
+        const availableStudentsResponse = await axios.get(`/api/courses/${this.selectedCourseId}/available-students`);
+        
+        if (availableStudentsResponse.data.success) {
+          this.$store.commit('enrollments/SET_AVAILABLE_STUDENTS', availableStudentsResponse.data.data);
+          console.log('Loaded available students:', availableStudentsResponse.data.data);
+        } else {
+          console.error('Failed to load available students:', availableStudentsResponse.data.message);
+          this.$store.commit('enrollments/SET_AVAILABLE_STUDENTS', []);
         }
         
         // Filter out students that have been transferred OUT of this course

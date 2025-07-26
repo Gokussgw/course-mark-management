@@ -381,6 +381,10 @@
               <p class="text-danger mt-3">
                 <strong>Note:</strong> Deleting this course will also remove all associated assessments and marks.
               </p>
+              <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Important:</strong> If this course has enrolled students, you must first remove all enrollments before deletion. Contact an administrator if you need assistance with this process.
+              </div>
             </div>
           </div>
           <div class="modal-footer">
@@ -456,6 +460,7 @@ export default {
       courses: [],
       courseComponents: [],
       marks: [],
+      assessments: [], // Add missing assessments array
       selectedComponent: null,
       notification: {
         title: '',
@@ -624,6 +629,9 @@ export default {
     },
     
     getAssessmentCountForCourse(courseId) {
+      if (!this.assessments || !Array.isArray(this.assessments)) {
+        return 0;
+      }
       return this.assessments.filter(a => a.course_id === courseId).length;
     },
     
@@ -762,8 +770,14 @@ export default {
         this.courseToDelete = null;
       } catch (error) {
         console.error('Error deleting course:', error);
+        
+        let errorMessage = 'Error deleting course. Please try again.';
+        if (error.message && error.message.includes('enrolled students')) {
+          errorMessage = 'Cannot delete course with enrolled students. Please remove all enrollments first or contact an administrator.';
+        }
+        
         this.$store.dispatch('showToast', { 
-          message: 'Error deleting course. Please try again.', 
+          message: errorMessage, 
           type: 'error' 
         });
       }
@@ -802,7 +816,7 @@ export default {
     },
     
     exportAssessmentsToCSV() {
-      if (!this.assessments.length) {
+      if (!this.assessments || !Array.isArray(this.assessments) || !this.assessments.length) {
         alert('No assessments to export');
         return;
       }

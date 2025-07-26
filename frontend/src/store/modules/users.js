@@ -231,6 +231,83 @@ export default {
         dispatch('setLoading', false, { root: true });
       }
     },
+
+    // Fetch advisees for the current advisor
+    async fetchAdvisees({ commit, dispatch, rootGetters }) {
+      try {
+        dispatch('setLoading', true, { root: true });
+        
+        let currentUser = rootGetters['auth/user'];
+        console.log('fetchAdvisees - Current user from store:', currentUser);
+        
+        // If user is undefined but we have authentication data in localStorage, try to restore it
+        if (!currentUser && localStorage.getItem('token') && localStorage.getItem('user')) {
+          console.log('fetchAdvisees - User undefined, trying to restore from localStorage');
+          try {
+            // Try to dispatch checkAuth to restore user state
+            await dispatch('auth/checkAuth', null, { root: true });
+            currentUser = rootGetters['auth/user'];
+            console.log('fetchAdvisees - User after checkAuth:', currentUser);
+          } catch (e) {
+            console.error('fetchAdvisees - Error in checkAuth:', e);
+          }
+          
+          // If still undefined, try parsing directly from localStorage
+          if (!currentUser) {
+            try {
+              const userFromStorage = JSON.parse(localStorage.getItem('user'));
+              console.log('fetchAdvisees - User from localStorage:', userFromStorage);
+              currentUser = userFromStorage;
+            } catch (e) {
+              console.error('fetchAdvisees - Error parsing user from localStorage:', e);
+            }
+          }
+        }
+        
+        if (!currentUser || currentUser.role !== 'advisor') {
+          const errorMsg = `Advisor access required. Current user: ${JSON.stringify(currentUser)}`;
+          console.error(errorMsg);
+          throw new Error(errorMsg);
+        }
+        
+        // Use the advisor dashboard API to get advisees
+        const token = localStorage.getItem('token');
+        console.log('fetchAdvisees - Token:', token ? `${token.substring(0, 20)}...` : 'No token');
+        
+        const apiUrl = `http://localhost:3000/advisor-dashboard-api.php?action=advisees`;
+        console.log('fetchAdvisees - Making request to:', apiUrl);
+        
+        const response = await axios.get(apiUrl, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        console.log('fetchAdvisees - Response:', response.data);
+        
+        // Transform the data to match the component expectations
+        const advisees = response.data.advisees.map(advisee => ({
+          id: advisee.id,
+          fullName: advisee.name,
+          studentId: advisee.matric_number,
+          email: advisee.email,
+          program: advisee.program || 'Not specified',
+          gpa: parseFloat(advisee.gpa) || 0,
+          enrolledCourses: advisee.enrolled_courses || 0,
+          status: advisee.status || 'Unknown',
+          risk: advisee.risk || 'Low'
+        }));
+        
+        commit('SET_ADVISEES', advisees);
+        return advisees;
+      } catch (error) {
+        const errorMsg = error.response?.data?.error || 'Failed to fetch advisees';
+        dispatch('setError', errorMsg, { root: true });
+        throw new Error(errorMsg);
+      } finally {
+        dispatch('setLoading', false, { root: true });
+      }
+    },
     
     // Fetch students assigned to an advisor
     async fetchAdviseesByAdvisor({ commit, dispatch }, advisorId) {

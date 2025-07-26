@@ -66,19 +66,18 @@
                           <div class="col-6">
                             <h3 class="text-success">
                               {{
-                                comparisonData.student_performance.total_score
+                                comparisonData?.student?.marks?.overall?.final_grade || 0
                               }}%
                             </h3>
                             <small class="text-muted">Overall Score</small>
                           </div>
                           <div class="col-6">
                             <h4 class="text-primary">
-                              {{ comparisonData.student_performance.rank }}
+                              {{ comparisonData?.student?.position || 'N/A' }}
                               <small class="text-muted"
                                 >/
                                 {{
-                                  comparisonData.student_performance
-                                    .total_students
+                                  comparisonData?.student?.total_students || 0
                                 }}</small
                               >
                             </h4>
@@ -101,7 +100,7 @@
                           <div class="col-6">
                             <h3 class="text-info">
                               {{
-                                comparisonData.class_performance.average_score
+                                comparisonData?.student?.marks?.overall?.class_stats?.class_average || 0
                               }}%
                             </h3>
                             <small class="text-muted">Class Average</small>
@@ -109,7 +108,7 @@
                           <div class="col-6">
                             <h4 class="text-secondary">
                               {{
-                                comparisonData.class_performance.total_enrolled
+                                comparisonData?.student?.total_students || 0
                               }}
                             </h4>
                             <small class="text-muted">Total Students</small>
@@ -154,55 +153,55 @@
                         </thead>
                         <tbody>
                           <tr
-                            v-for="assessment in comparisonData.assessments"
-                            :key="assessment.assessment.name"
+                            v-for="(assessment, key) in assessmentData"
+                            :key="key"
                           >
                             <td>
-                              <strong>{{ assessment.assessment.name }}</strong>
+                              <strong>{{ formatAssessmentName(key) }}</strong>
                               <br />
                               <small class="text-muted">
-                                Weight: {{ assessment.assessment.weightage }}%
+                                Component: {{ key }}
                               </small>
                             </td>
                             <td>
                               <span class="badge bg-secondary">
-                                {{ assessment.assessment.type }}
+                                {{ key.replace('_', ' ') }}
                               </span>
                             </td>
                             <td>
-                              {{ assessment.student_performance.mark }} /
-                              {{ assessment.assessment.max_mark }}
+                              {{ assessment.mark || 0 }} /
+                              100
                             </td>
                             <td>
                               <span
                                 class="badge"
                                 :class="
                                   getPerformanceBadgeClass(
-                                    assessment.student_performance.percentage
+                                    assessment.percentage
                                   )
                                 "
                               >
-                                {{ assessment.student_performance.percentage }}%
+                                {{ assessment.percentage || 0 }}%
                               </span>
                             </td>
-                            <td>{{ assessment.class_statistics.average }}</td>
+                            <td>{{ assessment.class_stats?.class_average || 0 }}</td>
                             <td>
                               {{
-                                assessment.class_statistics.average_percentage
+                                assessment.class_stats?.class_average || 0
                               }}%
                             </td>
-                            <td>{{ assessment.class_statistics.highest }}</td>
+                            <td>{{ assessment.class_stats?.highest_mark || 0 }}</td>
                             <td>
                               <span
                                 class="badge"
                                 :class="
-                                  assessment.comparison.above_average
+                                  assessment.comparison?.above_average
                                     ? 'bg-success'
                                     : 'bg-warning'
                                 "
                               >
                                 {{
-                                  assessment.comparison.above_average
+                                  assessment.comparison?.above_average
                                     ? "Above Average"
                                     : "Below Average"
                                 }}
@@ -210,12 +209,11 @@
                               <br />
                               <small class="text-muted">
                                 {{
-                                  assessment.comparison
-                                    .difference_from_average > 0
+                                  (assessment.comparison?.difference_from_average || 0) > 0
                                     ? "+"
                                     : ""
                                 }}{{
-                                  assessment.comparison.difference_from_average
+                                  assessment.comparison?.difference_from_average || 0
                                 }}
                                 pts
                               </small>
@@ -224,21 +222,21 @@
                               <small class="text-muted">
                                 25th:
                                 {{
-                                  assessment.class_statistics.percentiles[
+                                  assessment.class_stats?.percentiles?.[
                                     "25th"
-                                  ]
+                                  ] || 0
                                 }}<br />
                                 50th:
                                 {{
-                                  assessment.class_statistics.percentiles[
+                                  assessment.class_stats?.percentiles?.[
                                     "50th"
-                                  ]
+                                  ] || 0
                                 }}<br />
                                 75th:
                                 {{
-                                  assessment.class_statistics.percentiles[
+                                  assessment.class_stats?.percentiles?.[
                                     "75th"
-                                  ]
+                                  ] || 0
                                 }}
                               </small>
                             </td>
@@ -316,10 +314,32 @@ export default {
     };
   },
   computed: {
+    assessmentData() {
+      if (!this.comparisonData?.student?.marks) return {};
+      const marks = this.comparisonData.student.marks;
+      const assessments = {};
+      Object.keys(marks).forEach(key => {
+        if (key !== 'overall') {
+          const assessment = marks[key];
+          const studentPercentage = assessment.percentage || 0;
+          const classAverage = assessment.class_stats?.class_average || 0;
+          const difference = studentPercentage - classAverage;
+          
+          assessments[key] = {
+            ...assessment,
+            comparison: {
+              above_average: difference > 0,
+              difference_from_average: difference.toFixed(1)
+            }
+          };
+        }
+      });
+      return assessments;
+    },
     performanceComparisonClass() {
       if (!this.comparisonData) return "bg-secondary";
-      const studentScore = this.comparisonData.student_performance.total_score;
-      const classAverage = this.comparisonData.class_performance.average_score;
+      const studentScore = this.comparisonData.student?.marks?.overall?.final_grade || 0;
+      const classAverage = this.comparisonData.student?.marks?.overall?.class_stats?.class_average || 0;
 
       if (studentScore > classAverage + 10) return "bg-success";
       if (studentScore > classAverage) return "bg-primary";
@@ -328,8 +348,8 @@ export default {
     },
     performanceComparisonText() {
       if (!this.comparisonData) return "No data";
-      const studentScore = this.comparisonData.student_performance.total_score;
-      const classAverage = this.comparisonData.class_performance.average_score;
+      const studentScore = this.comparisonData.student?.marks?.overall?.final_grade || 0;
+      const classAverage = this.comparisonData.student?.marks?.overall?.class_stats?.class_average || 0;
       const difference = studentScore - classAverage;
 
       if (difference > 10)
@@ -344,25 +364,26 @@ export default {
       const strengths = [];
       const improvements = [];
 
-      this.comparisonData.assessments.forEach((assessment) => {
-        if (assessment.comparison.above_average) {
-          if (assessment.comparison.difference_from_average > 5) {
-            strengths.push(
-              `Strong performance in ${assessment.assessment.type} (${assessment.assessment.name})`
-            );
-          }
-        } else {
-          if (assessment.comparison.difference_from_average < -5) {
-            improvements.push(
-              `Focus needed on ${assessment.assessment.type} (${assessment.assessment.name})`
-            );
-          }
+      Object.keys(this.assessmentData).forEach((key) => {
+        const assessment = this.assessmentData[key];
+        const studentPercentage = parseFloat(assessment.percentage) || 0;
+        const classAverage = parseFloat(assessment.class_stats?.class_average) || 0;
+        const difference = studentPercentage - classAverage;
+        
+        if (difference > 5) {
+          strengths.push(
+            `Strong performance in ${this.formatAssessmentName(key)} (+${difference.toFixed(1)}% above average)`
+          );
+        } else if (difference < -5) {
+          improvements.push(
+            `Focus needed on ${this.formatAssessmentName(key)} (${difference.toFixed(1)}% below average)`
+          );
         }
       });
 
       // Overall performance insights based on rank
-      const studentRank = this.comparisonData.student_performance.rank;
-      const totalStudents = this.comparisonData.student_performance.total_students;
+      const studentRank = this.comparisonData?.student?.position;
+      const totalStudents = this.comparisonData?.student?.total_students;
       if (studentRank && totalStudents) {
         if (studentRank <= Math.ceil(totalStudents * 0.25)) {
           strengths.push("Consistently high performer in class");
@@ -467,6 +488,15 @@ export default {
       if (percentage >= 70) return "bg-info";
       if (percentage >= 60) return "bg-warning";
       return "bg-danger";
+    },
+    formatAssessmentName(key) {
+      const names = {
+        assignment: 'Assignment',
+        quiz: 'Quiz',
+        test: 'Test',
+        final_exam: 'Final Exam'
+      };
+      return names[key] || key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
     },
   },
 };

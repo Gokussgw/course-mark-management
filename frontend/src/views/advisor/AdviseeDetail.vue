@@ -5,28 +5,35 @@
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
+      <p>Loading advisee details...</p>
     </div>
 
     <!-- Error state -->
     <div v-else-if="error" class="alert alert-danger">
+      <i class="fas fa-exclamation-triangle me-2"></i>
       {{ error }}
+      <div class="mt-2">
+        <router-link to="/advisor/advisees" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left"></i> Back to Advisees
+        </router-link>
+      </div>
     </div>
 
     <!-- Content -->
-    <div v-else>
+    <div v-else-if="student">
       <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
           <router-link to="/advisor/advisees" class="btn btn-outline-secondary mb-3">
             <i class="fas fa-arrow-left"></i> Back to Advisees
           </router-link>
-          <h1>{{ student.fullName }}</h1>
-          <p class="text-muted">{{ student.studentId }} | {{ student.program }}</p>
+          <h1>{{ student.fullName || 'Student Name Not Available' }}</h1>
+          <p class="text-muted">{{ student.studentId || 'ID Not Available' }} | {{ student.program || 'Program Not Specified' }}</p>
         </div>
         <div class="student-contact">
           <div class="mb-2">
-            <i class="fas fa-envelope"></i> {{ student.email }}
+            <i class="fas fa-envelope"></i> {{ student.email || 'Email Not Available' }}
           </div>
-          <div v-if="student.phone">
+          <div v-if="student.phone && student.phone !== 'Not provided'">
             <i class="fas fa-phone"></i> {{ student.phone }}
           </div>
         </div>
@@ -43,22 +50,22 @@
               <div class="d-flex justify-content-between mb-3">
                 <strong>Current GPA:</strong>
                 <span :class="{'text-success': student.gpa >= 3.0, 'text-warning': student.gpa < 3.0 && student.gpa >= 2.0, 'text-danger': student.gpa < 2.0}">
-                  {{ student.gpa.toFixed(2) }}
+                  {{ student.gpa?.toFixed(2) || '0.00' }}
                 </span>
               </div>
               <div class="d-flex justify-content-between mb-3">
                 <strong>Completed Credits:</strong>
-                <span>{{ student.completedCredits }}</span>
+                <span>{{ student.completedCredits || 0 }}</span>
               </div>
               <div class="d-flex justify-content-between mb-3">
                 <strong>Current Status:</strong>
-                <span :class="{'text-success': student.status === 'Good Standing', 'text-warning': student.status === 'Academic Warning', 'text-danger': student.status === 'Academic Probation'}">
-                  {{ student.status }}
+                <span :class="{'text-success': student.status === 'Good Standing', 'text-warning': student.status === 'Warning', 'text-danger': student.status === 'Probation'}">
+                  {{ student.status || 'Unknown' }}
                 </span>
               </div>
               <div class="d-flex justify-content-between">
                 <strong>Program Progress:</strong>
-                <span>{{ (student.completedCredits / student.totalCreditsRequired * 100).toFixed(1) }}%</span>
+                <span>{{ student.completedCredits && student.totalCreditsRequired ? ((student.completedCredits / student.totalCreditsRequired) * 100).toFixed(1) : '0.0' }}%</span>
               </div>
             </div>
           </div>
@@ -72,11 +79,11 @@
             <div class="card-body">
               <div class="d-flex justify-content-between mb-3">
                 <strong>Enrolled Courses:</strong>
-                <span>{{ student.currentCourses.length }}</span>
+                <span>{{ student.enrolled_courses || 0 }}</span>
               </div>
               <div class="d-flex justify-content-between mb-3">
                 <strong>Total Credits:</strong>
-                <span>{{ totalCurrentCredits }}</span>
+                <span>{{ totalCurrentCredits || 0 }}</span>
               </div>
               <div class="d-flex justify-content-between mb-3">
                 <strong>At-Risk Courses:</strong>
@@ -85,7 +92,7 @@
               <div class="d-flex justify-content-between">
                 <strong>Projected GPA:</strong>
                 <span :class="{'text-success': projectedGpa >= 3.0, 'text-warning': projectedGpa < 3.0 && projectedGpa >= 2.0, 'text-danger': projectedGpa < 2.0}">
-                  {{ projectedGpa.toFixed(2) }}
+                  {{ projectedGpa?.toFixed(2) || '0.00' }}
                 </span>
               </div>
             </div>
@@ -95,41 +102,69 @@
 
       <!-- Current Courses -->
       <h2 class="mb-4">Current Courses</h2>
-      <div class="table-responsive mb-5">
-        <table class="table table-hover">
-          <thead class="table-light">
-            <tr>
-              <th>Course</th>
-              <th>Code</th>
-              <th>Credits</th>
-              <th>Current Mark</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="course in student.currentCourses" :key="course.id">
-              <td>{{ course.name }}</td>
-              <td>{{ course.code }}</td>
-              <td>{{ course.credits }}</td>
-              <td>
-                <span :class="{'text-success': course.currentMark >= 70, 'text-warning': course.currentMark < 70 && course.currentMark >= 50, 'text-danger': course.currentMark < 50}">
-                  {{ course.currentMark }}%
-                </span>
-              </td>
-              <td>
-                <span class="badge" :class="{'bg-success': course.currentMark >= 70, 'bg-warning': course.currentMark < 70 && course.currentMark >= 50, 'bg-danger': course.currentMark < 50}">
-                  {{ getCourseStatus(course) }}
-                </span>
-              </td>
-              <td>
-                <button class="btn btn-sm btn-primary" @click="viewCourseDetails(course)">
-                  View Details
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="mb-5">
+        <div v-if="student.currentCourses && student.currentCourses.length > 0" class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Course</th>
+                <th>Code</th>
+                <th>Credits</th>
+                <th>Lecturer</th>
+                <th>Current Grade</th>
+                <th>Progress</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="course in student.currentCourses" :key="course.id">
+                <td>
+                  <strong>{{ course.name }}</strong>
+                  <br>
+                  <small class="text-muted">{{ course.semester }}</small>
+                </td>
+                <td>{{ course.code }}</td>
+                <td>{{ course.credits }}</td>
+                <td>{{ course.lecturer }}</td>
+                <td>
+                  <span :class="{'text-success': course.currentMark >= 70, 'text-warning': course.currentMark < 70 && course.currentMark >= 50, 'text-danger': course.currentMark < 50}">
+                    {{ course.currentMark }}%
+                  </span>
+                </td>
+                <td>
+                  <div class="progress" style="height: 20px;">
+                    <div 
+                      class="progress-bar" 
+                      :class="{'bg-success': course.progress >= 80, 'bg-warning': course.progress < 80 && course.progress >= 50, 'bg-danger': course.progress < 50}"
+                      :style="`width: ${course.progress}%`"
+                    >
+                      {{ course.progress }}%
+                    </div>
+                  </div>
+                  <small class="text-muted">{{ course.completedAssessments }}/{{ course.totalAssessments }} assessments</small>
+                </td>
+                <td>
+                  <span class="badge" :class="{'bg-success': course.currentMark >= 70, 'bg-warning': course.currentMark < 70 && course.currentMark >= 50, 'bg-danger': course.currentMark < 50}">
+                    {{ course.status }}
+                  </span>
+                </td>
+                <td>
+                  <button class="btn btn-sm btn-primary" @click="viewCourseDetails(course)">
+                    View Details
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else class="alert alert-info">
+          <i class="fas fa-info-circle me-2"></i>
+          <strong>Course enrollment information loading...</strong><br>
+          This student is enrolled in {{ student.enrolled_courses || 0 }} course(s). 
+          <span v-if="student.enrolled_courses > 0">Detailed course information is being loaded.</span>
+          <span v-else>No current enrollments found.</span>
+        </div>
       </div>
 
       <!-- Previous Courses -->
@@ -239,6 +274,7 @@
 <script>
 import { mapActions } from 'vuex'
 import Chart from 'chart.js/auto'
+import axios from 'axios'
 
 export default {
   name: 'AdviseeDetail',
@@ -278,28 +314,83 @@ export default {
     async loadStudentData() {
       try {
         this.loading = true;
-        this.student = await this.fetchAdviseeById(this.studentId);
+        console.log('Loading advisee data for ID:', this.studentId);
         
-        // Initialize the student object with default values if properties don't exist
-        if (!this.student.advisorNotes) this.student.advisorNotes = [];
-        if (!this.student.status) {
-          this.student.status = this.student.gpa >= 70 ? 'Good Standing' : 
-                               (this.student.gpa >= 50 ? 'Warning' : 'Probation');
-        }
-        if (!this.student.totalCreditsRequired) this.student.totalCreditsRequired = 120;
-        if (!this.student.currentCredits) this.student.currentCredits = this.student.enrolled_courses * 3 || 0;
+        const adviseeData = await this.fetchAdviseeById(this.studentId);
+        console.log('Received advisee data:', adviseeData);
+        
+        // Transform the API response to match the component's expected structure
+        this.student = {
+          id: adviseeData.id,
+          fullName: adviseeData.name,
+          studentId: adviseeData.matric_number,
+          email: adviseeData.email,
+          phone: adviseeData.phone || 'Not provided',
+          program: adviseeData.program || 'Not specified',
+          gpa: parseFloat(adviseeData.gpa) || 0,
+          completedCredits: adviseeData.completed_credits || 0,
+          totalCreditsRequired: adviseeData.total_credits_required || 120,
+          status: adviseeData.status || 'Unknown',
+          currentCourses: [],
+          previousCourses: adviseeData.previousCourses || [],
+          advisorNotes: adviseeData.advisorNotes || [],
+          enrolled_courses: adviseeData.enrolled_courses || 0
+        };
+        
+        console.log('Transformed student data:', this.student);
+        
+        // Load detailed course information
+        await this.loadStudentCourses();
         
         this.$nextTick(() => {
           this.initGpaChart();
         });
       } catch (err) {
+        console.error('Error in loadStudentData:', err);
         this.error = 'Error loading student data: ' + (err.message || err);
-        console.error('Error loading student data:', err);
       } finally {
         this.loading = false;
       }
     },
-    
+
+    async loadStudentCourses() {
+      try {
+        console.log('Loading course data for student ID:', this.studentId);
+        
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`http://localhost:3000/advisor-dashboard-api.php?action=advisee_courses&student_id=${this.studentId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        console.log('Course data response:', response.data);
+        
+        const courses = response.data.courses || [];
+        
+        // Transform courses data to match component expectations
+        this.student.currentCourses = courses.map(course => ({
+          id: course.id,
+          name: course.name,
+          code: course.code,
+          credits: course.credits || 3,
+          currentMark: course.current_grade || 0,
+          lecturer: course.lecturer_name || 'TBA',
+          semester: course.semester || 'Current',
+          status: course.status || 'In Progress',
+          progress: course.progress || 0,
+          totalAssessments: course.total_assessments || 0,
+          completedAssessments: course.completed_assessments || 0
+        }));
+        
+        console.log('Transformed course data:', this.student.currentCourses);
+      } catch (err) {
+        console.error('Error loading student courses:', err);
+        // Don't throw error here, just log it - the main student data is more important
+        console.warn('Course data not available, showing basic enrollment count only');
+      }
+    },
+
     getCourseStatus(course) {
       if (course.currentMark >= 70) return 'Good';
       if (course.currentMark >= 50) return 'Concern';

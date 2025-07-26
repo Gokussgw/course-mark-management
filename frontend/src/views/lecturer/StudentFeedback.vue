@@ -17,7 +17,7 @@
               id="courseSelect" 
               class="form-select" 
               v-model="selectedCourseId" 
-              @change="loadCourseFeedback"
+              @change="onCourseChange"
             >
               <option value="">-- Select a Course --</option>
               <option v-for="course in courses" :key="course.id" :value="course.id">
@@ -166,6 +166,12 @@
                         {{ student.name }} ({{ student.matric_number }})
                       </option>
                     </select>
+                    <small class="text-muted" v-if="courseStudents.length === 0">
+                      No students enrolled in this course
+                    </small>
+                    <small class="text-muted" v-else>
+                      {{ courseStudents.length }} students available
+                    </small>
                   </div>
                 </div>
                 <div class="col-md-6">
@@ -392,10 +398,10 @@ export default {
         }
 
         console.log('Making API call with lecturer_id:', userId);
-        const response = await axios.get(`http://localhost:8080/marks-api.php?action=lecturer_courses&lecturer_id=${userId}`);
+        const response = await axios.get(`/api/courses?lecturer_id=${userId}`);
         console.log('API response:', response.data);
         
-        this.courses = response.data.courses || [];
+        this.courses = response.data || [];
         console.log('Courses loaded:', this.courses.length);
       } catch (error) {
         console.error('Error loading courses:', error);
@@ -407,6 +413,10 @@ export default {
       }
     },
 
+    onCourseChange() {
+      this.loadCourseFeedback();
+    },
+
     async loadCourseFeedback() {
       if (!this.selectedCourseId) {
         this.feedbackList = [];
@@ -416,7 +426,7 @@ export default {
       this.isLoading = true;
       try {
         const lecturerId = this.getUser?.id;
-        const response = await axios.get(`http://localhost:8080/feedback-api.php?action=lecturer_feedback&lecturer_id=${lecturerId}&course_id=${this.selectedCourseId}`);
+        const response = await axios.get(`/feedback-api.php?action=lecturer_feedback&lecturer_id=${lecturerId}&course_id=${this.selectedCourseId}`);
         this.feedbackList = response.data.feedback || [];
         
         // Also load students for this course
@@ -434,8 +444,19 @@ export default {
 
     async loadCourseStudents() {
       try {
-        const response = await axios.get(`http://localhost:8080/marks-api.php?action=course_students_marks&course_id=${this.selectedCourseId}`);
-        this.courseStudents = response.data.students || [];
+        console.log('Loading students for course:', this.selectedCourseId);
+        const response = await axios.get(`/api/courses/${this.selectedCourseId}/enrollments`);
+        console.log('Enrollments response:', response.data);
+        
+        // Transform enrollment data to student format expected by the dropdown
+        this.courseStudents = (response.data.data || []).map(enrollment => ({
+          id: enrollment.student_id,
+          name: enrollment.student_name,
+          email: enrollment.student_email,
+          matric_number: enrollment.matric_number
+        }));
+        
+        console.log('Transformed students:', this.courseStudents);
       } catch (error) {
         console.error('Error loading students:', error);
       }
@@ -483,31 +504,21 @@ export default {
     async saveFeedback() {
       this.isSaving = true;
       try {
-        const url = this.isEditMode 
-          ? 'http://localhost:8080/feedback-api.php?action=update_feedback'
-          : 'http://localhost:8080/feedback-api.php?action=add_feedback';
-        
-        const method = this.isEditMode ? 'PUT' : 'POST';
-        
-        const response = await axios({
-          method: method,
-          url: url,
-          data: this.feedbackForm
-        });
+        await (this.isEditMode 
+          ? axios.put(`/feedback-api.php?action=update_feedback`, this.feedbackForm)
+          : axios.post('/feedback-api.php?action=add_feedback', this.feedbackForm));
 
-        if (response.data.success) {
-          this.$store.dispatch('showToast', {
-            message: response.data.message,
-            type: 'success'
-          });
-          
-          // Hide modal
-          const modal = Modal.getInstance(document.getElementById('feedbackModal'));
-          modal.hide();
-          
-          // Reload feedback list
-          await this.loadCourseFeedback();
-        }
+        this.$store.dispatch('showToast', {
+          message: this.isEditMode ? 'Feedback updated successfully' : 'Feedback added successfully',
+          type: 'success'
+        });
+        
+        // Hide modal
+        const modal = Modal.getInstance(document.getElementById('feedbackModal'));
+        modal.hide();
+        
+        // Reload feedback list
+        await this.loadCourseFeedback();
       } catch (error) {
         console.error('Error saving feedback:', error);
         this.$store.dispatch('showToast', {
@@ -525,16 +536,14 @@ export default {
       }
 
       try {
-        const response = await axios.delete(`http://localhost:8080/feedback-api.php?action=delete_feedback&id=${feedback.id}`);
+        await axios.delete(`/feedback-api.php?action=delete_feedback&id=${feedback.id}`);
         
-        if (response.data.success) {
-          this.$store.dispatch('showToast', {
-            message: 'Feedback deleted successfully',
-            type: 'success'
-          });
-          
-          await this.loadCourseFeedback();
-        }
+        this.$store.dispatch('showToast', {
+          message: 'Feedback deleted successfully',
+          type: 'success'
+        });
+        
+        await this.loadCourseFeedback();
       } catch (error) {
         console.error('Error deleting feedback:', error);
         this.$store.dispatch('showToast', {

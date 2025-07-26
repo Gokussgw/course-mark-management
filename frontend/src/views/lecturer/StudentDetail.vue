@@ -22,7 +22,7 @@
           <span v-else>Student Details</span>
         </h1>
         <p class="text-muted" v-if="student">
-          {{ student.email }} | Student ID: {{ student.student_id || 'N/A' }}
+          {{ student.email }} | Student ID: {{ student.matric_number || student.student_id || 'N/A' }}
         </p>
       </div>
       <div class="btn-group">
@@ -36,9 +36,14 @@
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
+      <p class="mt-3">Loading student details...</p>
     </div>
 
-    <div v-else-if="!student" class="alert alert-danger">
+    <div v-else-if="error" class="alert alert-danger">
+      <strong>Error:</strong> {{ error }}
+    </div>
+
+    <div v-else-if="!student" class="alert alert-warning">
       Student not found or you don't have access to this student's information.
     </div>
 
@@ -62,7 +67,7 @@
               <tbody>
                 <tr>
                   <th>Student ID:</th>
-                  <td>{{ student.student_id || 'Not specified' }}</td>
+                  <td>{{ student.matric_number || student.student_id || 'Not specified' }}</td>
                 </tr>
                 <tr>
                   <th>Department:</th>
@@ -311,6 +316,7 @@ export default {
       courseId: null,
       studentNotes: [],
       selectedMark: null,
+      error: null,
       editMarkForm: {
         mark: 0,
         remarks: ''
@@ -375,19 +381,22 @@ export default {
     this.studentId = parseInt(this.$route.params.id);
     this.courseId = this.$route.query.courseId;
     
+    console.log('StudentDetail created:', { studentId: this.studentId, courseId: this.courseId });
+    
     try {
       // Fetch student details
+      console.log('Fetching user:', this.studentId);
       await this.fetchUser(this.studentId);
+      console.log('User fetched:', this.student);
       
       if (this.courseId) {
         // Fetch course details if a specific course is selected
+        console.log('Fetching course:', this.courseId);
         await this.fetchCourse(this.courseId);
-        
-        // Fetch assessments for this course
-        await this.fetchAssessments({ courseId: this.courseId });
       }
       
       // Fetch marks for this student
+      console.log('Fetching marks for student:', this.studentId);
       await this.fetchMarks({ 
         studentId: this.studentId,
         courseId: this.courseId
@@ -397,6 +406,7 @@ export default {
       await this.fetchStudentNotes();
     } catch (error) {
       console.error('Error loading student details:', error);
+      this.error = error.message || 'Failed to load student details';
     }
   },
   methods: {

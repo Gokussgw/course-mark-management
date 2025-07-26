@@ -271,4 +271,4 @@ $app->group('/api/courses', function ($group) {
             return $response->withStatus(500)->withHeader('Content-Type', 'application/json');
         }
     });
-});
+})->add(new JwtMiddleware($container));

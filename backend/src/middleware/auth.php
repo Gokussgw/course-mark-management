@@ -32,7 +32,16 @@ class JwtMiddleware
             $jwtSecret = $this->container->get('settings')['jwt']['secret'];
             $payload = JWT::decode($jwt, new Key($jwtSecret, 'HS256'));
 
+            // Create user object for backward compatibility
+            $user = (object) [
+                'id' => $payload->id,
+                'email' => $payload->email,
+                'role' => $payload->role,
+                'name' => $payload->name
+            ];
+
             // Add user info to the request attributes
+            $request = $request->withAttribute('user', $user);
             $request = $request->withAttribute('userId', $payload->id);
             $request = $request->withAttribute('userEmail', $payload->email);
             $request = $request->withAttribute('userRole', $payload->role);

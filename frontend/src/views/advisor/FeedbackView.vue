@@ -314,7 +314,28 @@ export default {
     async loadAdviseesFeedback() {
       this.isLoading = true;
       try {
-        const advisorId = this.getUser?.id;
+        let advisorUser = this.getUser;
+        
+        // If user is undefined, try to restore from localStorage
+        if (!advisorUser && localStorage.getItem('token') && localStorage.getItem('user')) {
+          try {
+            await this.$store.dispatch('auth/checkAuth');
+            advisorUser = this.getUser;
+          } catch (e) {
+            console.error('Error in checkAuth:', e);
+          }
+          
+          // If still undefined, try parsing directly from localStorage
+          if (!advisorUser) {
+            try {
+              advisorUser = JSON.parse(localStorage.getItem('user'));
+            } catch (e) {
+              console.error('Error parsing user from localStorage:', e);
+            }
+          }
+        }
+        
+        const advisorId = advisorUser?.id;
         if (!advisorId) {
           this.$store.dispatch('showToast', {
             message: 'Please login first',
@@ -323,12 +344,24 @@ export default {
           return;
         }
 
+        console.log('Loading feedback for advisor ID:', advisorId);
+
         // Load advisees first
-        const adviseesResponse = await axios.get(`http://localhost:8080/db-api.php?action=get_advisees&advisor_id=${advisorId}`);
+        const adviseesResponse = await axios.get(`http://localhost:3000/advisor-dashboard-api.php?action=advisees`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        console.log('Advisees response:', adviseesResponse.data);
         this.advisees = adviseesResponse.data.advisees || [];
 
         // Load feedback for all advisees
-        const feedbackResponse = await axios.get(`http://localhost:8080/feedback-api.php?action=advisor_feedback&advisor_id=${advisorId}`);
+        const feedbackResponse = await axios.get(`http://localhost:3000/feedback-api.php?action=advisor_feedback&advisor_id=${advisorId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        console.log('Feedback response:', feedbackResponse.data);
         this.feedbackList = feedbackResponse.data.feedback || [];
       } catch (error) {
         console.error('Error loading advisees feedback:', error);

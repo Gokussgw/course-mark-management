@@ -294,13 +294,13 @@
                     </div>
                   </td>
                   <td v-for="assessment in uniqueAssessments" :key="assessment.id" class="text-center">
-                    <div v-if="student.marks[assessment.id]">
-                      <strong :class="getScoreClass(student.marks[assessment.id].percentage)">
-                        {{ student.marks[assessment.id].percentage }}%
+                    <div v-if="student.marks[assessment.type]">
+                      <strong :class="getScoreClass(student.marks[assessment.type].percentage)">
+                        {{ student.marks[assessment.type].percentage }}%
                       </strong>
                       <br>
                       <small class="text-muted">
-                        {{ student.marks[assessment.id].obtained }}/{{ student.marks[assessment.id].max_marks }}
+                        {{ student.marks[assessment.type].obtained }}/{{ student.marks[assessment.type].max_mark }}
                       </small>
                     </div>
                     <div v-else class="text-muted">
@@ -394,14 +394,14 @@ export default {
 
         let endpoint = '';
         if (this.currentUserRole === 'lecturer') {
-          endpoint = `http://localhost:3000/marks-api.php?action=lecturer_courses&lecturer_id=${userId}`;
+          endpoint = `/marks-api.php?action=lecturer_courses&lecturer_id=${userId}`;
         } else if (this.currentUserRole === 'student') {
-          endpoint = `http://localhost:3000/breakdown-api.php?action=student_courses&student_id=${userId}`;
+          endpoint = `/breakdown-api.php?action=student_courses&student_id=${userId}`;
         } else if (this.currentUserRole === 'advisor') {
-          endpoint = `http://localhost:3000/breakdown-api.php?action=advisor_courses&advisor_id=${userId}`;
+          endpoint = `/breakdown-api.php?action=advisor_courses&advisor_id=${userId}`;
         } else {
           // Default to student courses for testing
-          endpoint = `http://localhost:3000/breakdown-api.php?action=student_courses&student_id=4`;
+          endpoint = `/breakdown-api.php?action=student_courses&student_id=4`;
         }
 
         console.log('API endpoint:', endpoint);
@@ -451,18 +451,34 @@ export default {
       this.isLoading = true;
       try {
         // Load students and marks for the course
-        const response = await axios.get(`http://localhost:3000/breakdown-api.php?action=course_breakdown&course_id=${this.selectedCourseId}`);
+        const response = await axios.get(`/breakdown-api.php?action=course_breakdown&course_id=${this.selectedCourseId}`);
         
         if (response.data && response.data.students) {
           // Map real data to component format
           this.students = response.data.students || [];
-          this.uniqueAssessments = response.data.assessments || [];
+          this.uniqueAssessments = (response.data.components || []).map(comp => ({
+            ...comp,
+            id: comp.type // Use type as id for template key
+          }));
+          
+          // Use backend's component breakdown if available
+          if (response.data.component_breakdown) {
+            this.assessmentBreakdown = response.data.component_breakdown.map(item => ({
+              type: item.type,
+              weightage: item.weightage,
+              total: item.total_students,
+              submitted: item.submissions,
+              average: item.average_percentage
+            }));
+            
+            console.log('Component breakdown mapped:', this.assessmentBreakdown);
+          }
           
           // Map statistics with correct property names
           if (response.data.statistics) {
             this.courseStats = {
               totalStudents: response.data.statistics.total_students,
-              totalAssessments: response.data.statistics.total_assessments,
+              totalAssessments: response.data.statistics.total_components,
               classAverage: response.data.statistics.class_average,
               atRiskStudents: response.data.statistics.at_risk_students
             };
@@ -471,11 +487,17 @@ export default {
           console.log('Real data loaded:', {
             students: this.students.length,
             assessments: this.uniqueAssessments.length,
-            stats: this.courseStats
+            stats: this.courseStats,
+            breakdown: this.assessmentBreakdown
           });
           
-          // Process the data for breakdown analysis
-          await this.processMarkBreakdown();
+          // Only process if we don't have backend breakdown data
+          if (!response.data.component_breakdown) {
+            console.log('No backend breakdown data, processing marks...');
+            await this.processMarkBreakdown();
+          } else {
+            console.log('Using backend breakdown data, skipping processMarkBreakdown');
+          }
         } else {
           // No real data, create sample data for demonstration
           console.log('No real data found, using sample data');
@@ -594,7 +616,7 @@ export default {
         this.students.forEach(student => {
           if (student.marks && student.marks[assessment.type]) {
             breakdown[assessment.type].submitted++;
-            breakdown[assessment.type].totalMarks += student.marks[assessment.type].max_marks || 0;
+            breakdown[assessment.type].totalMarks += student.marks[assessment.type].max_mark || 0;
             breakdown[assessment.type].obtainedMarks += student.marks[assessment.type].obtained || 0;
           }
         });
@@ -648,8 +670,8 @@ export default {
           name: assessment.name,
           type: assessment.type,
           obtained: mark?.obtained || 0,
-          max_marks: mark?.max_marks || assessment.max_marks || 0,
-          percentage: mark ? Math.round((mark.obtained / mark.max_marks) * 100) : 0,
+          max_marks: mark?.max_mark || assessment.max_mark || 0,
+          percentage: mark ? Math.round((mark.obtained / mark.max_mark) * 100) : 0,
           weighted: mark?.weighted || 0,
           classAverage
         };
@@ -674,11 +696,20 @@ export default {
       };
 
       this.$nextTick(() => {
-        this.createStudentTrendChart();
+        // Add a small delay to ensure the DOM is fully updated
+        setTimeout(() => {
+          this.createStudentTrendChart();
+        }, 100);
       });
     },
 
     calculateStudentFinalMark(student) {
+      // Use the final mark from backend if available
+      if (student.finalMark !== undefined && student.finalMark !== null) {
+        return student.finalMark;
+      }
+      
+      // Fallback to calculation
       let totalWeighted = 0;
       
       Object.values(student.marks || {}).forEach(mark => {
@@ -731,9 +762,12 @@ export default {
       this.destroyCharts();
       
       const ctx = document.getElementById('assessmentChart');
-      if (!ctx) return;
+      if (!ctx || !this.assessmentBreakdown || this.assessmentBreakdown.length === 0) {
+        return;
+      }
 
-      this.assessmentChart = new Chart(ctx, {
+      try {
+        this.assessmentChart = new Chart(ctx, {
         type: 'bar',
         data: {
           labels: this.assessmentBreakdown.map(item => this.formatAssessmentType(item.type)),
@@ -762,39 +796,62 @@ export default {
           }
         }
       });
+      } catch (error) {
+        console.error('Error creating assessment chart:', error);
+      }
     },
 
     createStudentTrendChart() {
-      const ctx = document.getElementById('studentTrendChart');
-      if (!ctx || !this.studentBreakdown) return;
+      // Destroy existing chart first
+      if (this.studentTrendChart) {
+        this.studentTrendChart.destroy();
+        this.studentTrendChart = null;
+      }
+      
+      // Wait for DOM to be ready with a timeout
+      this.$nextTick(() => {
+        const ctx = document.getElementById('studentTrendChart');
+        if (!ctx || !this.studentBreakdown || !this.studentBreakdown.assessments) {
+          console.log('Chart creation skipped: element or data not ready', {
+            hasCtx: !!ctx,
+            hasBreakdown: !!this.studentBreakdown,
+            hasAssessments: !!(this.studentBreakdown?.assessments)
+          });
+          return;
+        }
 
-      this.studentTrendChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: this.studentBreakdown.assessments.map(a => a.name),
-          datasets: [{
-            label: 'Student Score',
-            data: this.studentBreakdown.assessments.map(a => a.percentage),
-            borderColor: 'rgba(75, 192, 192, 1)',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-            tension: 0.1
-          }, {
-            label: 'Class Average',
-            data: this.studentBreakdown.assessments.map(a => a.classAverage),
-            borderColor: 'rgba(255, 159, 64, 1)',
-            backgroundColor: 'rgba(255, 159, 64, 0.2)',
-            tension: 0.1
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              beginAtZero: true,
-              max: 100
+        try {
+          this.studentTrendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: this.studentBreakdown.assessments.map(a => a.name),
+              datasets: [{
+                label: 'Student Score',
+                data: this.studentBreakdown.assessments.map(a => a.percentage),
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+              }, {
+                label: 'Class Average',
+                data: this.studentBreakdown.assessments.map(a => a.classAverage),
+                borderColor: 'rgba(255, 159, 64, 1)',
+                backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                tension: 0.1
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  max: 100
+                }
+              }
             }
-          }
+          });
+        } catch (error) {
+          console.error('Error creating student trend chart:', error);
         }
       });
     },

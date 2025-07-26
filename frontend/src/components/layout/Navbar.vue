@@ -48,7 +48,7 @@
               </ul>
             </li>
             <li class="nav-item">
-              <router-link class="nav-link" to="/lecturer/students">Students</router-link>
+              <router-link class="nav-link" to="/lecturer/marks">Students & Marks</router-link>
             </li>
           </template>
           
@@ -179,7 +179,7 @@
 
 <script>
 import { mapGetters } from 'vuex';
-import bootstrap from 'bootstrap';
+import { Modal } from 'bootstrap';
 import NotificationsDropdown from '../notifications/NotificationsDropdown.vue';
 
 export default {
@@ -247,7 +247,7 @@ export default {
       };
       
       // Open the modal using Bootstrap's JavaScript
-      const modal = new bootstrap.Modal(document.getElementById('addCourseModal'));
+      const modal = new Modal(document.getElementById('addCourseModal'));
       modal.show();
     },
     async addCourse() {
@@ -262,7 +262,7 @@ export default {
         
         // Close the modal using Bootstrap's JavaScript
         const modalElement = document.getElementById('addCourseModal');
-        const modal = bootstrap.Modal.getInstance(modalElement);
+        const modal = Modal.getInstance(modalElement);
         modal.hide();
         
         // Reload courses

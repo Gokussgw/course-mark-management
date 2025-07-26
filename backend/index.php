@@ -12,6 +12,7 @@ use Slim\Exception\HttpNotFoundException;
 use Dotenv\Dotenv;
 
 require __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/src/middleware/auth.php';
 
 // Load environment variables
 $dotenv = Dotenv::createImmutable(__DIR__);
